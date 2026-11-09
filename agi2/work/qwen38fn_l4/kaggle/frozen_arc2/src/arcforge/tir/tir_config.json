@@ -1,0 +1,52 @@
+{
+  "teacher_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "source_puzzles": "NVARC synthetic ARC-style relational tasks (47,337 puzzles)",
+  "reasoning_mode": "tool-integrated reasoning (TIR), thinking mode, effort=max",
+  "sampling": {
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "max_tokens": 131072
+  },
+  "rollout": {
+    "n_train_pairs": 4,
+    "attempts": 1,
+    "max_turns": 120,
+    "tool_timeout_s": 20,
+    "tool_max_output_chars": 4000,
+    "prompt_style": "harness"
+  },
+  "serving": {
+    "engine": "sglang",
+    "tp": 4,
+    "kv_cache_dtype": "fp8_e4m3",
+    "speculative": "DSPARK",
+    "concurrency": 136
+  },
+  "tool": {
+    "type": "function",
+    "function": {
+      "name": "python",
+      "description": "Run Python in a persistent sandbox session and get back whatever the code prints. The session keeps its variables between calls. The puzzle's data is already loaded in it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Python source to execute. The value of a trailing expression is echoed, like a notebook cell."
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    }
+  },
+  "tool_name": "python",
+  "system_prompt_template": "You are participating in a puzzle solving competition. You are an expert at solving puzzles.\n\nYou have a stateful Python sandbox. The puzzle's data is already loaded in it, so you never need to retype the grids:\n\n    train_pairs   list of {{\"input\": grid, \"output\": grid}} -- the same training pairs shown in the question\n    test_input    grid -- the same test input shown in the question\n    np            numpy, already imported\n\nA grid is a list of lists of integers 0-9. Variables you define persist across calls, so you can build up your analysis over several calls. The sandbox has no network and cannot write files; it is for computation only. Each call is cut off after {tool_timeout:g} seconds and its output is truncated at {tool_max_output_chars} characters, so print summaries rather than dumping large grids.\n\nUse the sandbox to check your reasoning rather than to replace it. A hypothesis is worth running when you can state it as code: write the transformation as a function, apply it to every training input, and compare against the expected training output. A mismatch tells you exactly where the hypothesis is wrong.\n\nYou have at most {max_turns} tool-calling turns. When you are ready, stop calling the tool and reply with the final output grid for the test input, in the same JSON format as the training outputs. Your final reply must contain the answer grid itself -- what the sandbox printed is not read by anyone.",
+  "token_storage": "append-only: each turn concatenates the teacher's own output_ids; `ids` is the exact flat sequence the teacher was conditioned on. Train on span_role==1 (assistant).",
+  "span_role_legend": {
+    "0": "prompt",
+    "1": "assistant",
+    "2": "tool_output"
+  }
+}

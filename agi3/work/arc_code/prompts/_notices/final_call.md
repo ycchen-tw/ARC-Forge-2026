@@ -1,0 +1,1 @@
+[harness] TIME IS ALMOST UP: about {minutes} minutes are left before this run ends and the scorecard closes. A level that is not cleared by then scores nothing, so from now on go at full speed: no long thinking, no notes, no tidying up. Send the actions most likely to clear the current level right away, in long batches, and keep playing until the time runs out.

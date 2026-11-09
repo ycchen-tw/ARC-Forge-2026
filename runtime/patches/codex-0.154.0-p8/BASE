@@ -1,0 +1,3 @@
+TAG=rust-v0.154.0
+REF=6b9826e3aa83b1a5947db50f4332cb9c65f1b340
+REPO=https://github.com/openai/codex.git

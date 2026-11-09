@@ -1,0 +1,114 @@
+Subject: [PATCH] arc: 0008-server-reasoning-included (trust the server's usage
+ to count past reasoning)
+
+`features.server_reasoning_included = true` makes the context check treat the
+provider's usage as already counting the earlier reasoning items it is sent
+back, as if every response carried `x-reasoning-included`.
+
+Upstream adds, for every reasoning item with `encrypted_content` before the
+last user message, `(len * 3 / 4 - 650) / 4` tokens on top of the last usage
+(`ContextManager::get_total_token_usage(false)`), because OpenAI's own server
+does not count them. sglang does: the request after a mid-turn user message
+grows by that message only. Normally the only user message is the kickoff and
+the term is 0; 0005's pre-compaction reminder is a user message, so right after
+it every earlier reasoning item is re-counted (median +11k tokens on the Kaggle
+arm) and auto-compaction fires about one response after the reminder, at ~92k
+real tokens instead of 100k. `exec resume` (a new user message) does the same
+to the pre-turn check.
+
+- `Session::get_total_token_usage` is the only reader of the per-stream flag,
+  so the override there covers every writer: the reset to false at each turn
+  start (`tasks/regular.rs`), the response header and the compaction stream.
+- `Feature::ServerReasoningIncluded`, under development and off by default
+  (the upstream behaviour is right for OpenAI's server).
+---
+ .../core/src/context_manager/history_tests.rs | 27 +++++++++++++++++++
+ codex-rs/core/src/session/mod.rs              |  9 ++++++-
+ codex-rs/features/src/lib.rs                  |  9 +++++++
+ 3 files changed, 44 insertions(+), 1 deletion(-)
+
+diff --git a/codex-rs/core/src/context_manager/history_tests.rs b/codex-rs/core/src/context_manager/history_tests.rs
+index 517e2fa..aadb4c1 100644
+--- a/codex-rs/core/src/context_manager/history_tests.rs
++++ b/codex-rs/core/src/context_manager/history_tests.rs
+@@ -3011,3 +3011,30 @@ fn unreadable_video_keeps_its_raw_size() {
+     let raw_len = serde_json::to_string(&item).unwrap().len() as i64;
+     assert_eq!(estimate_response_item_model_visible_bytes(&item), raw_len);
+ }
++
++#[test]
++fn reasoning_before_a_mid_turn_user_message_is_added_only_when_the_server_does_not_count_it() {
++    // What patch 0008 switches: a mid-turn user message (0005's pre-compaction reminder) makes
++    // every earlier reasoning item "non-last"; with server_reasoning_included=false its estimate
++    // is added on top of the server usage, with true (features.server_reasoning_included) not.
++    let reasoning = reasoning_with_encrypted_content(/*len*/ 40_000);
++    let mut history = create_history_with_items(vec![
++        user_msg("play"),
++        reasoning.clone(),
++        assistant_msg("ok"),
++        user_msg("context nearly full"),
++    ]);
++    history.update_token_info(
++        &TokenUsage {
++            total_tokens: 1_000,
++            ..Default::default()
++        },
++        /*model_context_window*/ None,
++    );
++    let included = history.get_total_token_usage(/*server_reasoning_included*/ true);
++    assert_eq!(
++        history.get_total_token_usage(/*server_reasoning_included*/ false),
++        included + estimate_item_token_count(&reasoning)
++    );
++    assert!(estimate_item_token_count(&reasoning) > 7_000);
++}
+diff --git a/codex-rs/core/src/session/mod.rs b/codex-rs/core/src/session/mod.rs
+index d9f8aca..bcca74a 100644
+--- a/codex-rs/core/src/session/mod.rs
++++ b/codex-rs/core/src/session/mod.rs
+@@ -1304,7 +1304,14 @@ impl Session {
+ 
+     pub(crate) async fn get_total_token_usage(&self) -> i64 {
+         let state = self.state.lock().await;
+-        state.get_total_token_usage(state.server_reasoning_included())
++        // Patch 0008: `features.server_reasoning_included` declares that the provider's usage
++        // already counts the earlier reasoning it is sent back (sglang does: the request after a
++        // mid-turn user message grows by that message only). This is the only reader of the
++        // per-stream flag, so overriding here covers every writer: the reset to false at each
++        // turn start (tasks/regular.rs), the response header and the compaction stream.
++        let server_reasoning_included = state.server_reasoning_included()
++            || self.features.enabled(Feature::ServerReasoningIncluded);
++        state.get_total_token_usage(server_reasoning_included)
+     }
+ 
+     pub(crate) async fn auto_compact_window_snapshot(&self) -> AutoCompactWindowSnapshot {
+diff --git a/codex-rs/features/src/lib.rs b/codex-rs/features/src/lib.rs
+index 81eec5b..87d1622 100644
+--- a/codex-rs/features/src/lib.rs
++++ b/codex-rs/features/src/lib.rs
+@@ -121,6 +121,9 @@ pub enum Feature {
+     /// Once per context window, past a token threshold, tell the model a compaction is near
+     /// (`$CODEX_HOME/compact_reminder`: threshold on the first line, the message after it).
+     PreCompactReminder,
++    /// The provider's usage already counts the earlier reasoning sent back to it: never add a
++    /// client-side estimate of it on top, whatever the response headers say.
++    ServerReasoningIncluded,
+     /// Record model-attempted tool calls in internal Responses metadata.
+     ExecutedToolCallMetadata,
+     /// Enable JavaScript code mode backed by the standalone host process.
+@@ -1050,6 +1053,12 @@ pub const FEATURES: &[FeatureSpec] = &[
+         stage: Stage::UnderDevelopment,
+         default_enabled: false,
+     },
++    FeatureSpec {
++        id: Feature::ServerReasoningIncluded,
++        key: "server_reasoning_included",
++        stage: Stage::UnderDevelopment,
++        default_enabled: false,
++    },
+     FeatureSpec {
+         id: Feature::ExecutedToolCallMetadata,
+         key: "executed_tool_call_metadata",
+-- 
+2.43.0
+

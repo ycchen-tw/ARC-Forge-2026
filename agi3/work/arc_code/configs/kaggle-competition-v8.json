@@ -1,0 +1,50 @@
+{
+  "schema_version": 6,
+  "games": 0,
+  "concurrency": 28,
+  "fence": "posix",
+  "game_seconds": 0,
+  "keep_driver_home": false,
+  "wall_seconds": 32400,
+  "effort": "xhigh",
+  "model_context_window": 150000,
+  "auto_compact_token_limit": 100000,
+  "gateway_port": 18733,
+  "env_port": 8731,
+  "model_port": 8799,
+  "competition_mode": true,
+  "auth": "strict",
+  "max_sessions": 11,
+  "resume_mode": "thread",
+  "prompts": "v8",
+  "min_session_seconds": 120,
+  "idle_session_seconds": 600,
+  "game_memory_max": "10G",
+  "process_data_max": "8G",
+  "official_port": 18801,
+  "rate_limit": 10.0,
+  "burst": 50.0,
+  "discover_seconds": 600,
+  "heartbeat_seconds": 300,
+  "watchdog_headroom": "12G",
+  "watchdog_cpu_seconds": 900,
+  "watchdog_interval_seconds": 2,
+  "oom_score_adj": 1000,
+  "driver_files": {
+    "model_instructions_file": "driver_files/codex/instructions.md",
+    "experimental_compact_prompt_file": "driver_files/codex/compact_prompt.md"
+  },
+  "driver_config": {
+    "features.view_video": "true",
+    "model_input_modalities": "[\"text\",\"image\",\"video\"]",
+    "features.sglang_session_release": "true",
+    "features.compaction_reuse_prefix": "true",
+    "features.compaction_strip_analysis": "true"
+  },
+  "note": "Scored rerun, v8: kaggle-competition.json with prompts v8, the game record and the workspace layout (keep_driver_home stays false). Same arm as the kaggle-saverun-90m-v8.json Save & Run.",
+  "record": {
+    "video_fps": 2.0,
+    "video_size": 384
+  },
+  "workspace_layout": true
+}

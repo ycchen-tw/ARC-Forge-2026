@@ -1,0 +1,421 @@
+{
+ "by_split": {
+  "arc3": {
+   "heldout": {
+    "jobs": 47,
+    "items": 47,
+    "tokens": 3867549,
+    "supervised": 2664880,
+    "eligible_anchors": 2663590
+   },
+   "train": {
+    "jobs": 13958,
+    "items": 13958,
+    "tokens": 1251082180,
+    "supervised": 830833446,
+    "eligible_anchors": 830456917
+   }
+  },
+  "arc2": {
+   "heldout": {
+    "jobs": 58,
+    "items": 58,
+    "tokens": 4242994,
+    "supervised": 3170513,
+    "eligible_anchors": 3169593
+   },
+   "train": {
+    "jobs": 25427,
+    "items": 25427,
+    "tokens": 1618995454,
+    "supervised": 1212659074,
+    "eligible_anchors": 1212282536
+   }
+  },
+  "node1": {
+   "train": {
+    "jobs": 4633,
+    "items": 4633,
+    "tokens": 282568754,
+    "supervised": 205138079,
+    "eligible_anchors": 205068155
+   }
+  }
+ },
+ "by_subset": {
+  "arc3": {
+   "synth": {
+    "heldout": {
+     "jobs": 8,
+     "items": 8,
+     "tokens": 485760,
+     "supervised": 331221,
+     "eligible_anchors": 331023
+    },
+    "train": {
+     "jobs": 1758,
+     "items": 1758,
+     "tokens": 161475556,
+     "supervised": 114443475,
+     "eligible_anchors": 114401448
+    }
+   },
+   "off25": {
+    "heldout": {
+     "jobs": 12,
+     "items": 12,
+     "tokens": 1186703,
+     "supervised": 836429,
+     "eligible_anchors": 836107
+    },
+    "train": {
+     "jobs": 2564,
+     "items": 2564,
+     "tokens": 245205932,
+     "supervised": 172447406,
+     "eligible_anchors": 172378477
+    }
+   },
+   "comm-A": {
+    "heldout": {
+     "jobs": 20,
+     "items": 20,
+     "tokens": 1642341,
+     "supervised": 1140525,
+     "eligible_anchors": 1140001
+    },
+    "train": {
+     "jobs": 2573,
+     "items": 2573,
+     "tokens": 228304625,
+     "supervised": 158976773,
+     "eligible_anchors": 158909284
+    }
+   },
+   "comm-B": {
+    "heldout": {
+     "jobs": 7,
+     "items": 7,
+     "tokens": 552745,
+     "supervised": 356705,
+     "eligible_anchors": 356459
+    },
+    "train": {
+     "jobs": 353,
+     "items": 353,
+     "tokens": 29568250,
+     "supervised": 19875132,
+     "eligible_anchors": 19865091
+    }
+   },
+   "i3-comm-B": {
+    "train": {
+     "jobs": 3247,
+     "items": 3247,
+     "tokens": 271274848,
+     "supervised": 160951540,
+     "eligible_anchors": 160863378
+    }
+   },
+   "benchbase-public25": {
+    "train": {
+     "jobs": 1815,
+     "items": 1815,
+     "tokens": 170200485,
+     "supervised": 110348717,
+     "eligible_anchors": 110297258
+    }
+   },
+   "i3-comm-C": {
+    "train": {
+     "jobs": 1153,
+     "items": 1153,
+     "tokens": 98979868,
+     "supervised": 63727205,
+     "eligible_anchors": 63692642
+    }
+   },
+   "benchple-public25": {
+    "train": {
+     "jobs": 495,
+     "items": 495,
+     "tokens": 46072616,
+     "supervised": 30063198,
+     "eligible_anchors": 30049339
+    }
+   }
+  },
+  "arc2": {
+   "independent1000": {
+    "heldout": {
+     "jobs": 58,
+     "items": 58,
+     "tokens": 4242994,
+     "supervised": 3170513,
+     "eligible_anchors": 3169593
+    },
+    "train": {
+     "jobs": 5236,
+     "items": 5236,
+     "tokens": 391135314,
+     "supervised": 290279134,
+     "eligible_anchors": 290192085
+    }
+   },
+   "i3-nvarc_training": {
+    "train": {
+     "jobs": 7078,
+     "items": 7078,
+     "tokens": 315751918,
+     "supervised": 227910709,
+     "eligible_anchors": 227824543
+    }
+   },
+   "benchple-eval120": {
+    "train": {
+     "jobs": 816,
+     "items": 816,
+     "tokens": 52892873,
+     "supervised": 41249707,
+     "eligible_anchors": 41237512
+    }
+   },
+   "benchbase-independent1000": {
+    "train": {
+     "jobs": 6493,
+     "items": 6493,
+     "tokens": 486319648,
+     "supervised": 368639663,
+     "eligible_anchors": 368536474
+    }
+   },
+   "benchbase-eval120": {
+    "train": {
+     "jobs": 2902,
+     "items": 2902,
+     "tokens": 183932118,
+     "supervised": 143405754,
+     "eligible_anchors": 143362399
+    }
+   },
+   "benchple-independent1000": {
+    "train": {
+     "jobs": 1495,
+     "items": 1495,
+     "tokens": 111865673,
+     "supervised": 84469556,
+     "eligible_anchors": 84445927
+    }
+   },
+   "i3-quality300": {
+    "train": {
+     "jobs": 1385,
+     "items": 1385,
+     "tokens": 75803879,
+     "supervised": 55850575,
+     "eligible_anchors": 55829925
+    }
+   },
+   "smoke": {
+    "train": {
+     "jobs": 22,
+     "items": 22,
+     "tokens": 1294031,
+     "supervised": 853976,
+     "eligible_anchors": 853671
+    }
+   }
+  },
+  "node1": {
+   "independent1000": {
+    "train": {
+     "jobs": 1917,
+     "items": 1917,
+     "tokens": 148345137,
+     "supervised": 112454494,
+     "eligible_anchors": 112424352
+    }
+   },
+   "arc3": {
+    "train": {
+     "jobs": 638,
+     "items": 638,
+     "tokens": 59536372,
+     "supervised": 39159669,
+     "eligible_anchors": 39141445
+    }
+   },
+   "synth108": {
+    "train": {
+     "jobs": 114,
+     "items": 114,
+     "tokens": 4556203,
+     "supervised": 3044090,
+     "eligible_anchors": 3042649
+    }
+   },
+   "nvarc_training": {
+    "train": {
+     "jobs": 898,
+     "items": 898,
+     "tokens": 43922677,
+     "supervised": 33105513,
+     "eligible_anchors": 33095203
+    }
+   },
+   "training1000": {
+    "train": {
+     "jobs": 1041,
+     "items": 1041,
+     "tokens": 25067368,
+     "supervised": 16613918,
+     "eligible_anchors": 16604544
+    }
+   },
+   "probe": {
+    "train": {
+     "jobs": 10,
+     "items": 10,
+     "tokens": 1648,
+     "supervised": 694,
+     "eligible_anchors": 676
+    }
+   },
+   "smoke": {
+    "train": {
+     "jobs": 15,
+     "items": 15,
+     "tokens": 1139349,
+     "supervised": 759701,
+     "eligible_anchors": 759286
+    }
+   }
+  }
+ },
+ "sources": {
+  "node1": {
+   "items": 4639,
+   "tokens": 282570026,
+   "supervised": 205138085,
+   "eligible_anchors": 205068155,
+   "kept_round_tokens": 0,
+   "gen_spans": 69930,
+   "stop_substituted": 0,
+   "rewound_gen_tokens": 21106
+  },
+  "arc2": {
+   "items": 25492,
+   "tokens": 1624423757,
+   "supervised": 1216919351,
+   "eligible_anchors": 1216541847,
+   "kept_round_tokens": 0,
+   "gen_spans": 377504,
+   "stop_substituted": 0,
+   "rewound_gen_tokens": 196899
+  },
+  "arc3": {
+   "items": 14005,
+   "tokens": 1254949729,
+   "supervised": 833498326,
+   "eligible_anchors": 833120507,
+   "kept_round_tokens": 0,
+   "gen_spans": 377819,
+   "stop_substituted": 0,
+   "rewound_gen_tokens": 134319
+  }
+ },
+ "skipped": {
+  "node1": {
+   "few_supervised": 6
+  },
+  "arc2": {
+   "few_supervised": 2,
+   "too_long": 5
+  }
+ },
+ "skipped_tokens": {
+  "node1": {
+   "few_supervised": 1272
+  },
+  "arc2": {
+   "few_supervised": 11949,
+   "too_long": 1173360
+  }
+ },
+ "groups": {
+  "arc2/benchbase-eval120": 120,
+  "arc2/benchbase-independent1000": 360,
+  "arc2/benchple-eval120": 120,
+  "arc2/benchple-independent1000": 360,
+  "arc2/i3-nvarc_training": 716,
+  "arc2/i3-quality300": 300,
+  "arc2/independent1000": 926,
+  "arc2/smoke": 4,
+  "arc3/benchbase-public25": 25,
+  "arc3/benchple-public25": 25,
+  "arc3/comm-A": 451,
+  "arc3/comm-B": 125,
+  "arc3/i3-comm-B": 478,
+  "arc3/i3-comm-C": 227,
+  "arc3/off25": 25,
+  "arc3/synth": 16,
+  "node1/arc3": 25,
+  "node1/independent1000": 1000,
+  "node1/nvarc_training": 716,
+  "node1/probe": 16,
+  "node1/smoke": 6,
+  "node1/synth108": 105,
+  "node1/training1000": 1000
+ },
+ "heldout": {
+  "pinned": {
+   "plan": "$ARC_RUNS/qwen38fn_dflash/20261017-codex1015-plan",
+   "plan_sha256": "c8e1608e7c2e07e54ebd7fe8a9b4fded9c0ed4b18e2c63ba1777c6be07fe41c3",
+   "items": 105,
+   "tokens": 8110543
+  }
+ },
+ "dropped": {
+  "codex1015": {
+   "no_workspace": {
+    "segments": 8,
+    "tokens": 1040,
+    "supervised": 64
+   },
+   "few_supervised": {
+    "segments": 135,
+    "tokens": 25890,
+    "supervised": 135
+   },
+   "harness_test": {
+    "segments": 3,
+    "tokens": 160330,
+    "supervised": 76192
+   }
+  },
+  "int3c1019": {
+   "no_workspace": {
+    "segments": 4,
+    "tokens": 520,
+    "supervised": 32
+   },
+   "few_supervised": {
+    "segments": 71,
+    "tokens": 13582,
+    "supervised": 71
+   }
+  },
+  "bench": {
+   "no_workspace": {
+    "segments": 3,
+    "tokens": 390,
+    "supervised": 24
+   },
+   "few_supervised": {
+    "segments": 14,
+    "tokens": 2968,
+    "supervised": 14
+   }
+  }
+ }
+}

@@ -1,0 +1,8 @@
+{
+  "step": 25562,
+  "format": "torch-zstd-v1",
+  "world_size": 3,
+  "replicated": true,
+  "source_init": "$ARC_RUNS/qwen38fn_dflash/20261020-l8-expand/step8251-L8-copy",
+  "dataset_manifest": "$ARC_RUNS/qwen38fn_dflash/20261020-l8-plan/summary.json"
+}

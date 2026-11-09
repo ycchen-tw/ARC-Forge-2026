@@ -1,0 +1,44 @@
+diff --git a/codex-rs/core/src/compact.rs b/codex-rs/core/src/compact.rs
+index 3aa7c1c..c25c5a8 100644
+--- a/codex-rs/core/src/compact.rs
++++ b/codex-rs/core/src/compact.rs
+@@ -608,7 +608,9 @@ fn compacted_user_message(
+     let Some(TurnItem::UserMessage(user)) = crate::event_mapping::parse_turn_item(item) else {
+         return None;
+     };
+-    if is_summary_message(&user.message()) {
++    if is_summary_message(&user.message())
++        || crate::session::turn::is_pre_compact_reminder(&user.message())
++    {
+         return None;
+     }
+     Some(CompactedUserMessage {
+diff --git a/codex-rs/core/src/session/turn.rs b/codex-rs/core/src/session/turn.rs
+index 175a66c..a02d6a5 100644
+--- a/codex-rs/core/src/session/turn.rs
++++ b/codex-rs/core/src/session/turn.rs
+@@ -1325,6 +1325,24 @@ async fn maybe_remind_before_compaction(
+     }
+ }
+ 
++/// The pre-compaction reminder has done its job once the compaction it announced has happened:
++/// a compaction must not carry it into the next window (patch 0006). Without this, each window's
++/// reminder was kept among the recent user messages and they piled up ahead of the summary,
++/// still saying a compaction was about to happen. The text is the same file
++/// `maybe_remind_before_compaction` reads, found through `CODEX_HOME` (the harness always sets it;
++/// no file means the feature is off and nothing is dropped). Read once per process.
++pub(crate) fn is_pre_compact_reminder(message: &str) -> bool {
++    static REMINDER: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
++    let reminder = REMINDER.get_or_init(|| {
++        let home = std::env::var_os("CODEX_HOME")?;
++        let text = std::fs::read_to_string(std::path::Path::new(&home).join("compact_reminder")).ok()?;
++        let (_, message) = text.split_once('\n')?;
++        let message = message.trim();
++        (!message.is_empty()).then(|| message.to_string())
++    });
++    reminder.as_deref().is_some_and(|reminder| message.trim() == reminder)
++}
++
+ /// `features.external_compact_request`: a harness asks for a compaction by creating
+ /// `$CODEX_HOME/compact_request`. The file may hold a token count; below it the request is
+ /// dropped (an early, small context is not worth summarising). Either way the file is consumed

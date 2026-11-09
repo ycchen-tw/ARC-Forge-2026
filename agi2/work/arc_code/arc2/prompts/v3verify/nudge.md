@@ -1,0 +1,1 @@
+Your session ended, but you are not finished: {status}. You have used about {used_k}k of your {budget_k}k output-token budget. Your files and previous/ are all still here. Continue from where you left off; stop when VERDICT.md says CONFIRMED, or says ALTERNATIVE and your transform passes every training pair and differs from the previous output on at least one test input.

@@ -1,0 +1,11 @@
+# c0L3: proxy same as c0i5 (trim + compaction tail + reminder after too long without acting)
+--trim-reasoning-at
+80000
+--trim-keep-items
+8
+--trim-min-gain
+15000
+--carry-tail-tokens
+10000
+--act-nudge-every
+8

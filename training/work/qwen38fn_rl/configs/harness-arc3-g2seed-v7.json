@@ -1,0 +1,25 @@
+{
+ "schema_version": 1,
+ "kind": "arc3_g2seed",
+ "fence": "bwrap",
+ "tito": {
+  "required": true
+ },
+ "cache_salt": "episode",
+ "concurrency": 24,
+ "arm_config": "work/arc_code/configs/b200-g2seed-rl-v7.json",
+ "arm_python": ".venv/bin/python",
+ "gateway_python": "$ARC_RUNS/arc_code/harness-venv/bin/python",
+ "corpus": "$ARC_ARC3_CORPUS",
+ "prep": "$ARC_DATA/arc-code-prep",
+ "ffmpeg": "$ARC_FFMPEG",
+ "model_context_window": 235000,
+ "auto_compact_token_limit": 130000,
+ "output_token_budget": 300000,
+ "episode_wall_seconds": 10800,
+ "note": "ARC-AGI-3 RL v7 (2026-10-28): one episode = level K of a game from a gen-2 level seed (stub kind g2seed), up to 300k output tokens (proxy-counted, reasoning included; a fuse the model never sees, no pace line) and the 2 x baseline action cap; a clear ends it at once. window_change: no context limit, the episode changes window at the g2 change point 130000 as deployed and every window is a training segment (prepare.allow_compaction). Score s = 1[cleared] x min(1, (kappa b / a)^2) with kappa = sqrt(100/115), the official per-level cap line. Window 235000 / served 240000 as the Kaggle v36 arm; 3-hour wall is a fuse; packet_level_docs latest with prompts g2tk5l (run_arm checks the brief).",
+ "serve_context_length": 240000,
+ "packet_level_docs": "latest",
+ "window_change": true,
+ "efficiency_free_fraction": 0.9325048082403138
+}

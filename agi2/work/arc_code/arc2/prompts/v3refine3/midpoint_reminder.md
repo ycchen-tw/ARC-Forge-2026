@@ -1,0 +1,1 @@
+Checkpoint: roughly half of your output budget is used (`cat budget.txt` for the exact number). If final/ does not yet hold attempt_1 and attempt_2 for every test input, write your current best for each now -- you can still improve them afterwards, but whatever is in final/ when the budget runs out is the answer.

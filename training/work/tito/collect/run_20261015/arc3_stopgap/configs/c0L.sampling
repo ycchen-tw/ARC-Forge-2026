@@ -1,0 +1,4 @@
+# c0's sampling: the sglang ResponsesRequest defaults (what is used when codex sends no sampling), stated explicitly here
+temperature=0.7
+top_p=1.0
+top_k=-1

@@ -1,0 +1,28 @@
+09-03 11:49:00 supervisor started TAGS="train nvfull" LIVE=160 TLIVE=80 interval=120s max_restarts=8
+09-03 11:49:00 == TAG=train: a 23669 tasks, b 23668 tasks
+09-03 11:49:02 runner a: started (--resume, TAG=train corpus=$HOME/work/dsv4/nvarc_distill/nvarc_training.jsonl.zst)
+09-03 11:49:19 runner b: started (--resume, TAG=train corpus=$HOME/work/dsv4/nvarc_distill/nvarc_training.jsonl.zst)
+09-04 00:03:15 runner a: started (--resume, TAG=train corpus=$HOME/work/dsv4/nvarc_distill/nvarc_training.jsonl.zst)
+09-04 00:05:02 runner b: started (--resume, TAG=train corpus=$HOME/work/dsv4/nvarc_distill/nvarc_training.jsonl.zst)
+09-04 02:48:43 supervisor started TAGS="mix" LIVE=160 TLIVE=80 interval=120s max_restarts=8
+09-04 02:48:43 == TAG=mix: a 48861 tasks, b 48861 tasks
+09-04 02:48:45 runner a: started (--resume, TAG=mix corpus=$HOME/work/dsv4/nvarc_distill/nvarc_training.jsonl.zst $ARC_DATA/nvarc_synthetic/nvarc_full.jsonl.zst)
+09-04 02:49:02 runner b: started (--resume, TAG=mix corpus=$HOME/work/dsv4/nvarc_distill/nvarc_training.jsonl.zst $ARC_DATA/nvarc_synthetic/nvarc_full.jsonl.zst)
+09-08 05:13:52 supervisor started pid=3701344 TAGS="mix" SIDES="b" LIVE=160 TLIVE=80 interval=120s max_restarts=8
+09-08 05:13:52 == TAG=mix SIDES=b: b 48861 tasks
+09-08 05:13:52 server b: start-up (GPUS=4,5,6,7 PORT=30032; serve_qwen38fn.sh checks GPU occupancy)
+09-08 05:16:36 runner b: started (--resume, TAG=mix corpus=$HOME/work/dsv4/nvarc_distill/nvarc_training.jsonl.zst $ARC_DATA/nvarc_synthetic/nvarc_full.jsonl.zst)
+09-08 09:28:45 launching systemd-run ReplaySSM+conc300
+09-08 09:28:57 supervisor started pid=3830020 TAGS="mix" SIDES="b" LIVE=300 TLIVE=150 MAXREQ=300 SSM_DTYPE=float32 REPLAY_SSM=1 interval=120s max_restarts=8
+09-08 09:28:57 == TAG=mix SIDES=b: b 48861 tasks
+09-08 09:28:57 server b: start-up (GPUS=4,5,6,7 PORT=30032 MAXREQ=300 SSM_DTYPE=float32 REPLAY_SSM=1 LIVE=300 TLIVE=150)
+09-08 09:31:20 runner b: started (--resume, TAG=mix corpus=$HOME/work/dsv4/nvarc_distill/nvarc_training.jsonl.zst $ARC_DATA/nvarc_synthetic/nvarc_full.jsonl.zst)
+09-09 06:09:41 pause requested: stopping mix-b to free GPU 4-7 (tasks=14679/48861)
+09-15 07:36:28 supervisor started pid=3216166 TAGS="mix" SIDES="b" LIVE=300 TLIVE=150 MAXREQ=300 SSM_DTYPE=float32 REPLAY_SSM=1 interval=120s max_restarts=8
+09-15 07:36:28 == TAG=mix SIDES=b: b 48861 tasks
+09-15 07:36:28 server b: start-up (GPUS=4,5,6,7 PORT=30032 MAXREQ=300 SSM_DTYPE=float32 REPLAY_SSM=1 LIVE=300 TLIVE=150)
+09-15 07:38:51 runner b: started (--resume, TAG=mix corpus=$HOME/work/dsv4/nvarc_distill/nvarc_training.jsonl.zst $ARC_DATA/nvarc_synthetic/nvarc_full.jsonl.zst)
+09-15 11:48:10 start mix-b DP2 rank0 LIVE=256 TLIVE=128 PORT=30042 remaining=33589
+09-15 12:53:20 switch mix-b to --dp-size 2 LIVE=512 TLIVE=256 (both ranks, sticky per task)
+09-15 12:59:16 rerun mix-b --dp-size 2 LIVE=512 with LimitNOFILE=1048576 (prev EMFILE)
+09-16 09:07:49 stop mix-b DP2 both-ranks + qwen38fn-dp2-fp16 (user: OK to stop)

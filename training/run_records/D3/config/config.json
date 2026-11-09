@@ -1,0 +1,136 @@
+{
+ "schema_version": 1,
+ "run_root": "$ARC_RUNS/qwen38fn_rl/20261030-arc3v8-g2seed-18g-235t-hw-g16-b256-r4c64-fp8kv-win1-note-codex-fullft-lr3e-6-wu2-tk5l-topp95k20-promptmean-mis-qadR-public25-contaminated",
+ "seed": 20261009,
+ "rounds": 100,
+ "tokenizer_dir": "/dev/shm/uid-$UID/models/qwen38fn-qadR1000-int3-gptq",
+ "poll_seconds": 5,
+ "min_free_gb": 70,
+ "disk_guard_paths": [
+  "$ARC_RUNS",
+  "$ARC_RAM_RUNS"
+ ],
+ "legacy_sync": false,
+ "pipeline": "stream",
+ "retention": {
+  "keep_merged": 2,
+  "drop_batch_payload": true
+ },
+ "stream": {
+  "group_size": 16,
+  "max_groups_in_flight": 32,
+  "max_pooled_groups": 128,
+  "batch_live_episodes": 256,
+  "max_staleness": 8,
+  "group_timeout_seconds": 14400,
+  "eval_keep_every": 5,
+  "hard_min_free_gb": 22,
+  "end_margin": 1.15,
+  "quarantine": {
+   "same_signature_max": 6,
+   "same_signature_seconds": 3600,
+   "max_fraction": 0.15,
+   "fraction_window_groups": 100,
+   "fraction_min_groups": 20
+  },
+  "group_ready": true,
+  "rollout_slots": 256,
+  "ramp_seconds": 600.0
+ },
+ "rollout": {
+  "base_url": "http://127.0.0.1:30570/v1",
+  "served_name": "qwen38fn",
+  "idle_timeout_seconds": 180,
+  "ledger_drain_timeout_seconds": 300,
+  "sync_timeout_seconds": 1800,
+  "replica_urls": [
+   "http://127.0.0.1:30571/v1",
+   "http://127.0.0.1:30572/v1",
+   "http://127.0.0.1:30573/v1",
+   "http://127.0.0.1:30574/v1"
+  ],
+  "trainer_base_path": "/dev/shm/uid-$UID/models/qwen38fn-qadR1000-int3-bf16dense"
+ },
+ "trainer": {
+  "endpoint_file": "$ARC_RUNS/qwen38fn_rl/20261030-arc3v8-g2seed-18g-235t-hw-g16-b256-r4c64-fp8kv-win1-note-codex-fullft-lr3e-6-wu2-tk5l-topp95k20-promptmean-mis-qadR-public25-contaminated/trainer/trainer_endpoint.json",
+  "train_timeout_seconds": 10800,
+  "publish_timeout_seconds": 1800,
+  "save_every_rounds": 1
+ },
+ "harness": {
+  "script": "work/arc_code/run_arc3_level.py",
+  "agent_python": "$ARC_RUNS/arc_code/agent-runtime-scipy/bin/python",
+  "driver_bin": "$ARC_CODEX_P8_PREFIX",
+  "config": "$ARC_RUNS/qwen38fn_rl/20261030-arc3v8-g2seed-18g-235t-hw-g16-b256-r4c64-fp8kv-win1-note-codex-fullft-lr3e-6-wu2-tk5l-topp95k20-promptmean-mis-qadR-public25-contaminated/harness-train.json",
+  "launch_stagger_seconds": 2,
+  "terminate_grace_seconds": 600
+ },
+ "tasks": {
+  "train": {
+   "dir": "$ARC_DATA/arc3_levels/g2seed-v8-20261029",
+   "ids_file": "$ARC_RUNS/qwen38fn_rl/20261030-arc3v8-g2seed-18g-235t-hw-g16-b256-r4c64-fp8kv-win1-note-codex-fullft-lr3e-6-wu2-tk5l-topp95k20-promptmean-mis-qadR-public25-contaminated/task_lists/train.txt",
+   "shuffle": true
+  },
+  "heldout": {
+   "dir": "$ARC_DATA/arc3_levels/g2seed-v8-20261029",
+   "ids_file": "$ARC_RUNS/qwen38fn_rl/20261030-arc3v8-g2seed-18g-235t-hw-g16-b256-r4c64-fp8kv-win1-note-codex-fullft-lr3e-6-wu2-tk5l-topp95k20-promptmean-mis-qadR-public25-contaminated/task_lists/heldout.txt"
+  }
+ },
+ "audit": {
+  "command": [
+   "$ARC_SGLANG_VENV/bin/python",
+   "-m",
+   "arcforge.tito"
+  ],
+  "whitelist": [],
+  "allow_budget_truncation": true,
+  "allow_splits": {
+   "text_differs": 256,
+   "evicted": 256
+  },
+  "per_run": false,
+  "timeout_seconds": 7200
+ },
+ "prepare": {
+  "command": [
+   "env",
+   "MEDIA_DEVICE=cpu-exact",
+   "CUDA_VISIBLE_DEVICES=",
+   "ARC_SGLANG_FORK=$HOME/work/sglang-arc-2-topp",
+   "bash",
+   "work/qwen38fn_lora/prepare_rl.sh",
+   "--workers",
+   "4"
+  ],
+  "timeout_seconds": 10800,
+  "temperature": 1.0,
+  "minibatches": 1,
+  "world": 4,
+  "bin_tokens": 200000,
+  "weight_version_recorded": true,
+  "max_gb": 64,
+  "reserve_gb": 3,
+  "adv_normalization": "none",
+  "loss_reduction": "prompt",
+  "top_p": 0.95,
+  "top_k": 20,
+  "allow_compaction": true,
+  "arc3_reward": "note",
+  "algo": "mis",
+  "mis_low": 0.2,
+  "mis_high": 5.0,
+  "max_d_cross_fraction": 0.05,
+  "max_routing_m_fraction": 0.03
+ },
+ "note_judge": {
+  "backend": "codex",
+  "python": "$ARC_DATA/venvs/arc3-judge/bin/python",
+  "model": "gpt-6-astra",
+  "effort": "medium",
+  "max_concurrent": 16,
+  "timeout_seconds": 18420.0,
+  "call_timeout_seconds": 1800.0,
+  "codex_bin": "$HOME/.codex/packages/standalone/releases/0.166.0-x86_64-unknown-linux-musl/bin/codex",
+  "codex_version": "codex-cli 0.166.0"
+ }
+}

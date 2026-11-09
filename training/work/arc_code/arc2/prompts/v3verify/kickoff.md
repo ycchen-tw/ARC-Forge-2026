@@ -1,0 +1,1 @@
+Verify the previous solution of the puzzle described in AGENTS.md; its work, starting with REPORT.md, is in previous/. The {n_images} images attached to this message are the puzzle's grids, in this order: {image_order}. Start now.

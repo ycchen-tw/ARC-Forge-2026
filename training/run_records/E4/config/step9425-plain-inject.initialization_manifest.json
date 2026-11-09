@@ -1,0 +1,17 @@
+{
+  "complete": true,
+  "files": [
+    "layer-0.safetensors",
+    "layer-1.safetensors",
+    "layer-2.safetensors",
+    "layer-3.safetensors",
+    "layer-4.safetensors",
+    "interface.safetensors"
+  ],
+  "kind": "plain-conversion",
+  "dtype": "bfloat16",
+  "source": "$ARC_NFS/runs/qwen38fn_dflash/20261017-dline-ext-codex1015/exports/step-9425-bf16",
+  "source_manifest_sha256": "a6586d76d676437320c0aabe68c2f306fad35c397c85d686fc480b968d7d4bac",
+  "source_config_sha256": "89d19ecae75f318be0d4d2431cde84fba9de9be1879bb7cee8afb0cb6013a9e0",
+  "converter_sha256": "192603846551ace32bdb9e5d8172e1c5b7b016c93c1d472eb558394e6a0dd137"
+}

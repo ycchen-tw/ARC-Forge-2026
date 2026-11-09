@@ -1,0 +1,32 @@
+{
+  "id": "threerabbits/qwen38fn-l4x4-c128-ext300-arcv6",
+  "id_no": 141035111,
+  "title": "qwen38fn-l4x4-c128-ext300-arcv6",
+  "code_file": "qwen38fn-l4x4-c128-ext300-arcv6.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "keywords": [
+    "gpu"
+  ],
+  "dataset_sources": [
+    "threerabbits/arcforge-codex-0154-p7",
+    "threerabbits/humming-kernels-0116",
+    "threerabbits/qwen38fn-dflash-planb-l8-s25562-fp8",
+    "threerabbits/qwen38fn-l4-v16-arcdensevocabtp4-gean-qad3-l4opt48",
+    "threerabbits/qwen38fn-sglang-0520-sm120-cp312",
+    "threerabbits/zstd-x86-64-kaggle"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "arc-prize-2026-arc-agi-2"
+  ],
+  "model_sources": [
+    "threerabbits/qwen38fn-gean320-int3-gptq/Transformers/default/3"
+  ],
+  "docker_image": "gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b88387388fade02bfa8bf3fc647d461",
+  "machine_shape": "NvidiaL4"
+}

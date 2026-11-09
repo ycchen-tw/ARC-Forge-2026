@@ -1,0 +1,117 @@
+--- /dev/null
++++ b/python/sglang/srt/layers/moe/moe_runner/triton_utils/configs/triton_3_7_1/E=320,N=640,device_name=NVIDIA_RTX_PRO_6000_Blackwell_Server_Edition,dtype=fp8_w8a8,block_shape=[128, 128].json
+@@ -0,0 +1,114 @@
++{
++    "1": {
++        "BLOCK_SIZE_M": 16,
++        "BLOCK_SIZE_N": 64,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 1,
++        "num_warps": 4,
++        "num_stages": 3
++    },
++    "2": {
++        "BLOCK_SIZE_M": 32,
++        "BLOCK_SIZE_N": 64,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 16,
++        "num_warps": 4,
++        "num_stages": 3
++    },
++    "4": {
++        "BLOCK_SIZE_M": 16,
++        "BLOCK_SIZE_N": 32,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 1,
++        "num_warps": 4,
++        "num_stages": 4
++    },
++    "8": {
++        "BLOCK_SIZE_M": 32,
++        "BLOCK_SIZE_N": 32,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 1,
++        "num_warps": 8,
++        "num_stages": 4
++    },
++    "16": {
++        "BLOCK_SIZE_M": 32,
++        "BLOCK_SIZE_N": 32,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 1,
++        "num_warps": 4,
++        "num_stages": 3
++    },
++    "32": {
++        "BLOCK_SIZE_M": 32,
++        "BLOCK_SIZE_N": 128,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 16,
++        "num_warps": 8,
++        "num_stages": 4
++    },
++    "48": {
++        "BLOCK_SIZE_M": 32,
++        "BLOCK_SIZE_N": 64,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 1,
++        "num_warps": 4,
++        "num_stages": 3
++    },
++    "55": {
++        "BLOCK_SIZE_M": 16,
++        "BLOCK_SIZE_N": 64,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 16,
++        "num_warps": 4,
++        "num_stages": 4
++    },
++    "64": {
++        "BLOCK_SIZE_M": 32,
++        "BLOCK_SIZE_N": 32,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 16,
++        "num_warps": 4,
++        "num_stages": 2
++    },
++    "96": {
++        "BLOCK_SIZE_M": 16,
++        "BLOCK_SIZE_N": 128,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 64,
++        "num_warps": 4,
++        "num_stages": 3
++    },
++    "128": {
++        "BLOCK_SIZE_M": 32,
++        "BLOCK_SIZE_N": 64,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 1,
++        "num_warps": 4,
++        "num_stages": 4
++    },
++    "192": {
++        "BLOCK_SIZE_M": 16,
++        "BLOCK_SIZE_N": 128,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 16,
++        "num_warps": 4,
++        "num_stages": 3
++    },
++    "220": {
++        "BLOCK_SIZE_M": 16,
++        "BLOCK_SIZE_N": 128,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 1,
++        "num_warps": 4,
++        "num_stages": 3
++    },
++    "256": {
++        "BLOCK_SIZE_M": 16,
++        "BLOCK_SIZE_N": 128,
++        "BLOCK_SIZE_K": 128,
++        "GROUP_SIZE_M": 1,
++        "num_warps": 4,
++        "num_stages": 3
++    }
++}

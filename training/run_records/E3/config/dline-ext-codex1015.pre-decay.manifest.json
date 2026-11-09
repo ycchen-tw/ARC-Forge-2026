@@ -1,0 +1,8 @@
+{
+  "step": 6000,
+  "format": "torch-zstd-v1",
+  "world_size": 2,
+  "replicated": true,
+  "source_init": "$ARC_NFS/runs/qwen38fn_mtp_dense/20261011-int3-target47/dline/M_T35_T39_T43_T47-m70-none-init",
+  "dataset_manifest": "$ARC_RUNS/qwen38fn_dflash/20261017-codex1015-plan/summary.json"
+}

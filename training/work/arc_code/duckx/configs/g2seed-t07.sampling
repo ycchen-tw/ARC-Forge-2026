@@ -1,0 +1,4 @@
+# gen-2 seed collection T0.7 (the g2b eval's sampling)
+temperature=0.7
+top_p=1.0
+top_k=-1

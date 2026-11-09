@@ -1,0 +1,1 @@
+Your session ended, but the puzzle is not finished: {status}. You have used about {used_k}k of your {budget_k}k output-token budget. solution.py, notes.md and your scripts are all still here. Continue from where you left off; when transform passes every training pair and gives a sensible output for every test input, stop.

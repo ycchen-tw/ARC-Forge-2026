@@ -1,0 +1,1 @@
+Your session ended, but final/ is not complete: {status}. You have used about {used_k}k of your {budget_k}k output-token budget. Your files and candidates/ are all still here. Continue from where you left off; stop when final/ holds two different attempts for every test input.

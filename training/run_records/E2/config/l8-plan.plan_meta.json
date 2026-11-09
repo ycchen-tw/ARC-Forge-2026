@@ -1,0 +1,252 @@
+{
+ "version": 1,
+ "created": "2026-10-19T19:28:18+00:00",
+ "argv": [
+  "work/qwen38fn_dflash/make_data_plan.py",
+  "--out",
+  "$ARC_RUNS/qwen38fn_dflash/20261020-l8-plan",
+  "--target-profile",
+  "$ARC_RUNS/qwen38fn_dflash/20261017-int3-target-profile/profile-int3-w3a8-tp1.json",
+  "--seed",
+  "0",
+  "--node1",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/node1/node1-p30241-20261005T205435-2524457",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/node1/node1-p30242-20261005T211903-2542675",
+  "--codex1015",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261014T211944-2607392",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T061802-2772632",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261014T212347-2618294",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T061759-2772638",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30813-20261014T212346-2618308",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30814-20261014T212349-2618322",
+  "--int3c1019",
+  "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30931/node1-p30931-20261019T080550-1127717",
+  "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30932/node1-p30932-20261019T080554-1127754",
+  "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30933/node1-p30933-20261019T080552-1127767",
+  "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30934/node1-p30934-20261019T080559-1127780",
+  "--bench",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/bench-base/node1-p30251-20261006T112333-111096",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/bench-ple/node2-p30261-20261008T085831-1746203",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/bench-ple/node2-p30261-20261008T150501-2221783",
+  "--heldout-from",
+  "$ARC_RUNS/qwen38fn_dflash/20261017-codex1015-plan",
+  "--fraction",
+  "node1=1",
+  "arc2=1",
+  "arc3=1",
+  "--passes",
+  "node1=1",
+  "arc2=1",
+  "arc3=1",
+  "--context-length",
+  "220000",
+  "--workers",
+  "16"
+ ],
+ "code": {
+  "commit": "e43722bee7f599b7a9fac0cbe8c8cccd711194d7",
+  "dirty": true
+ },
+ "seed": 0,
+ "context_length": 220000,
+ "block_size": 8,
+ "anchor_rule": "a >= 1 and mask[a] and mask[a + 1]",
+ "min_supervised": 7,
+ "heldout_tokens": 3000000.0,
+ "heldout_salt": "dflash-data-plan-v1",
+ "arc3_heldout_games": 2,
+ "heldout_parents": 8,
+ "image_detail": "high",
+ "codex_heldout": null,
+ "codex_heldout_groups": [],
+ "heldout_from": {
+  "plan": "$ARC_RUNS/qwen38fn_dflash/20261017-codex1015-plan",
+  "plan_sha256": "c8e1608e7c2e07e54ebd7fe8a9b4fded9c0ed4b18e2c63ba1777c6be07fe41c3",
+  "items": 105,
+  "tokens": 8110543
+ },
+ "known_approximations": [
+  "codex1015: think-budget-forced tokens stay supervised (not sampled; 436 of 185M arc3 tokens where the ledger kept flags)",
+  "int3c1019: think-budget-forced tokens stay supervised (arc3 ran ARC_THINK_BUDGET=24576)"
+ ],
+ "corpora": {
+  "node1": {
+   "fraction": 1.0,
+   "passes": 1,
+   "sources": [
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/node1/node1-p30241-20261005T205435-2524457",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/node1/node1-p30242-20261005T211903-2542675"
+   ]
+  },
+  "arc2": {
+   "fraction": 1.0,
+   "passes": 1,
+   "sources": [
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261014T211944-2607392",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T061802-2772632",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261014T212347-2618294",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T061759-2772638",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30813-20261014T212346-2618308",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30814-20261014T212349-2618322",
+    "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30931/node1-p30931-20261019T080550-1127717",
+    "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30932/node1-p30932-20261019T080554-1127754",
+    "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30933/node1-p30933-20261019T080552-1127767",
+    "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30934/node1-p30934-20261019T080559-1127780",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/bench-base/node1-p30251-20261006T112333-111096",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/bench-ple/node2-p30261-20261008T085831-1746203",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/bench-ple/node2-p30261-20261008T150501-2221783"
+   ]
+  },
+  "arc3": {
+   "fraction": 1.0,
+   "passes": 1,
+   "sources": [
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261014T211944-2607392",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T061802-2772632",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261014T212347-2618294",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T061759-2772638",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30813-20261014T212346-2618308",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30814-20261014T212349-2618322",
+    "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30931/node1-p30931-20261019T080550-1127717",
+    "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30932/node1-p30932-20261019T080554-1127754",
+    "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30933/node1-p30933-20261019T080552-1127767",
+    "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30934/node1-p30934-20261019T080559-1127780",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/bench-base/node1-p30251-20261006T112333-111096",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/bench-ple/node2-p30261-20261008T085831-1746203",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/bench-ple/node2-p30261-20261008T150501-2221783"
+   ]
+  }
+ },
+ "target_profile": {
+  "path": "$ARC_RUNS/qwen38fn_dflash/20261017-int3-target-profile/profile-int3-w3a8-tp1.json",
+  "instance": "node1-p31749-20261017T094258-1018307",
+  "sha256": "79c05febb562d17ef39616266f76d99a04977729ea7bb36fbb51b0c1b9afbdde",
+  "served_model_name": "dflash-capture.node1-p31749-20261017T094258-1018307.79c05febb562d17e",
+  "model_path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/qwen38fn-gean320-int3-gptq"
+ },
+ "tokenizer": {
+  "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/qwen38fn-gean320-int3-gptq/tokenizer.json",
+  "sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3"
+ },
+ "tito_instances": [
+  {
+   "name": "node1-p30241-20261005T205435-2524457",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/node1/node1-p30241-20261005T205435-2524457",
+   "kind": "node1",
+   "server_json_sha256": "64c809b0c1deb0c5145c9c1f4766453d70816ad102051a4a81157203350cf609"
+  },
+  {
+   "name": "node1-p30242-20261005T211903-2542675",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/node1/node1-p30242-20261005T211903-2542675",
+   "kind": "node1",
+   "server_json_sha256": "e1997ffc6d649796ee5ff13a8cf229af890a496d213ece203d071f269761b9d3"
+  },
+  {
+   "name": "node1-p30811-20261014T211944-2607392",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261014T211944-2607392",
+   "kind": "codex1015",
+   "server_json_sha256": "7d4ef215c87522470d136c728d0df4ec6e9067dfe450fcd146f5d6513b082850"
+  },
+  {
+   "name": "node1-p30811-20261015T032003-3677178",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+   "kind": "codex1015",
+   "server_json_sha256": "cb8bfd269baca748c8377c6017f139dcb124d25510791f8a6d08780aca31d689"
+  },
+  {
+   "name": "node1-p30811-20261015T061802-2772632",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T061802-2772632",
+   "kind": "codex1015",
+   "server_json_sha256": "75b1da2ec65f0fc958a7480d4818fdad1b652ef98572a6b663b48ee73b6f724d"
+  },
+  {
+   "name": "node1-p30812-20261014T212347-2618294",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261014T212347-2618294",
+   "kind": "codex1015",
+   "server_json_sha256": "fe0bd61bd5a158d8a81e678a27be387cd9a3f66cb41286f0a5f1635cda67bd39"
+  },
+  {
+   "name": "node1-p30812-20261015T032000-3677184",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184",
+   "kind": "codex1015",
+   "server_json_sha256": "e8e0f2f196bb27c6955f5e7cc8e6ed01f43e0504d095ebdddd22e3f10da40fa8"
+  },
+  {
+   "name": "node1-p30812-20261015T061759-2772638",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T061759-2772638",
+   "kind": "codex1015",
+   "server_json_sha256": "813263e7eb5c3926d25ebc26a9b97fb44ac36c19df953a07d64e1634c40b3ce7"
+  },
+  {
+   "name": "node1-p30813-20261014T212346-2618308",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30813-20261014T212346-2618308",
+   "kind": "codex1015",
+   "server_json_sha256": "033ab2adaae0a723b1405647cf5c3952d0766b462ec6406ffc46571327915aa5"
+  },
+  {
+   "name": "node1-p30814-20261014T212349-2618322",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30814-20261014T212349-2618322",
+   "kind": "codex1015",
+   "server_json_sha256": "c50be2bc5d027ae6131fe4bcdc0fc3159a9203fdf0ea7f97fd9eb27a583f6267"
+  },
+  {
+   "name": "node1-p30931-20261019T080550-1127717",
+   "path": "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30931/node1-p30931-20261019T080550-1127717",
+   "kind": "int3c1019",
+   "server_json_sha256": "a55c064fd9e251a758b704746bc04c846f353623e46bb3e022dce18ff1dc1cf3"
+  },
+  {
+   "name": "node1-p30932-20261019T080554-1127754",
+   "path": "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30932/node1-p30932-20261019T080554-1127754",
+   "kind": "int3c1019",
+   "server_json_sha256": "83989aa0dae265e7887debfcab7d030b42287ea24f779418514b363b01f29981"
+  },
+  {
+   "name": "node1-p30933-20261019T080552-1127767",
+   "path": "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30933/node1-p30933-20261019T080552-1127767",
+   "kind": "int3c1019",
+   "server_json_sha256": "3460409ba59c8494cf98c32f570c633a607aefe81aa7e3f0a4959bd2daed88d2"
+  },
+  {
+   "name": "node1-p30934-20261019T080559-1127780",
+   "path": "$ARC_RAM_RUNS/tito/20261019-int3-collect/ledger/p30934/node1-p30934-20261019T080559-1127780",
+   "kind": "int3c1019",
+   "server_json_sha256": "0b06260f360c74f0398d2772056ff740a7b4b516df640fecd4f0993ea9730deb"
+  },
+  {
+   "name": "node1-p30251-20261006T112333-111096",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/bench-base/node1-p30251-20261006T112333-111096",
+   "kind": "bench",
+   "server_json_sha256": "4cddb91e67d5e0df8839f7def4afd1154c236582a6de879742e857832f3e6db9"
+  },
+  {
+   "name": "node2-p30261-20261008T085831-1746203",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/bench-ple/node2-p30261-20261008T085831-1746203",
+   "kind": "bench",
+   "server_json_sha256": "5ce05b300a888f222239dd565a6399c7214c8b391df0cfe270c716da7a261d1b"
+  },
+  {
+   "name": "node2-p30261-20261008T150501-2221783",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261020-l8-sources/bench-ple/node2-p30261-20261008T150501-2221783",
+   "kind": "bench",
+   "server_json_sha256": "33d21148705ba554936878a842f871bd56d65b13651f69e048c3f79039c5bfb5"
+  }
+ ],
+ "sources": [],
+ "heldout": {
+  "pinned": {
+   "plan": "$ARC_RUNS/qwen38fn_dflash/20261017-codex1015-plan",
+   "plan_sha256": "c8e1608e7c2e07e54ebd7fe8a9b4fded9c0ed4b18e2c63ba1777c6be07fe41c3",
+   "items": 105,
+   "tokens": 8110543
+  }
+ },
+ "plan_sha256": "503f3f17c0c9df32c66d74cfbdf066f8b895612e4d9e1a7313073bfcbab6f2e2",
+ "jobs": 44123
+}

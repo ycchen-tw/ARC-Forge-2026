@@ -1,0 +1,112 @@
+{
+ "note": "11-01 x39 RL edition (user: fix what x34-x38 showed and do not lose big when the hidden rerun is harder than the public eval) = ...-x38rl-full.json with: (1) extra_solvers.estimator instead of the four backlog constants -- the unstarted s2 / refine_exp and the running s0 / s2 / refine_exp are estimated from the RL priors (priors/rl_r4v30.json, four RL G4 runs: mean totals and E[T-u|T>u] tables) times a per-run difficulty multiplier m(t) (Kaplan-Meier restricted mean of this run's s0 / s2 output, running ones right-censored, over the prior's on the same horizon; shrink_n0 60, clip [0.8, 2.0]); the running refine_exp is no longer counted twice (x37 at D-200: 1.67x over the actual remaining main line -> 1.01x); room = 0.9 x the full-load throughput (EMA of polls with >= 0.9 C running; per-stream x C over-estimated it 1.2-1.6x at partial load) x time to D-30 min, and the admission counts the extra's wrap-up too; (2) agreement blocking false, max_inflight 24: refine_exp of an agreed task no longer waits for the agreement extra (x38 had 29 refine_exp started where x37 had 41 done + 76 running at the same point), the extra queues after refine_exp, its result goes to the re-refiner when it disagrees (rerefine_skip_agreed then does not skip); (3) the s2 runway rule: extras rank ahead of s2 only while now + queued s2 x L_s2 / R_full + one s2's wall + refine_reserve <= deadline, else behind s2 (lead flag, HEARTBEAT); (4) refine_reserve_seconds 5400 -> 7200 (late refiners p90 109-123 min at mid load); (5) blocking_until_seconds 14400: an ordinary / informed / undecided extra admitted under 240 min to the deadline does not hold up refine_exp either; (6) max_running 64 -> 48 (room for the re-refiner fillers). Unchanged: prompts, budgets, trigger 80k, min_budget 60k, wrap-up 32k, informed {100k, disagree}, undecided, tail, retry_hold_on backlog, reserve_queued. Previous note: 10-31 x38 RL edition (user: fix the idle tail of the RL runs, building on x37) = ...-x37rl-full.json with extra_solvers backlog {s2 70000, refine 40000, running_solver 100000, running_refine 50000} (the backlog gate's estimates of the main line's remaining output: the defaults, set for the base weights, overestimate it for RL by 1.15x at D-560 rising to 2.0x at D-200 on the x35+RL / x36+RL G4 runs, so admissions were refused with slots free -- x37+RL at D-430: backlog 37.8M vs room 36.5M; these values give 1.00-1.07x over D-560..D-350 and stay >= 1 after), agreement {min_output_tokens 0, max_budget 100000, after_s2 true} (every task where s0 and s2 pass train and agree gets one independent extra solver if the gates allow: RL's agreeing-but-wrong tasks are spread over every output length, 3.0 of x36+RL's 10.5 wrong-agreed units under 40k; capped at 100k, which covers 90% of RL solvers on those tasks; queued after s2 so it never delays the s2 that decides informed), undecided true (after an extra solver, a task with a train-passing candidate that is still undecided gets the second extra solver before refine_exp: x36+RL lost 2.85 points on disagreeing tasks with one extra and no correct candidate, while the refiner picks the right one when it is there), retry_hold_on [backlog] (a budget refusal does not recover, so it no longer holds refine_exp), max_running 64 (32 was full from D-480 to D-270 on x36+RL and x37+RL). Unchanged: refine_reserve_seconds 5400, min_budget 60000, wrapup 32000, max_per_task 2, informed, tail. x35+RL / x36+RL G4 left 11-12M tokens (18-20%) of capacity idle against 4.7M for the base runs. Previous note: 10-31 x37 RL edition (user: use the budget RL leaves idle; designed with the codex schedule replay) = ...-x36rl-full.json with extra_solvers reserve_queued true (queued extra solvers count in the backlog gate), retry_hold_seconds 900 (an informed / agreement solver refused by the budget or backlog gate when s0 and s2 finish holds that task's refine_exp and is retried every poll for up to 15 min; before, it was checked once: x36+RL G4 at 90 G4 min had 4 of 14 eligible tasks refused for good) and agreement {min_output_tokens 120000} (s0 and s2 pass train and agree with 120k+ output tokens together: one independent v4ydual extra solver before refine_exp; x35+RL lost 1.88 of 6.81 on agreeing-but-wrong tasks, which got no extra solver, while RL leaves slots idle from about D-3.5 h). Every refused admission is logged (NOT ADMITTED / HOLD lines) and counted in summary extra_solvers.admission. Previous note: 10-31 x36 RL edition (user: a more aggressive x36 for the RL r4@30 weights, G4 first) = x36-full with informed {min_output_tokens 100000, disagree true}: the RL model writes less (x35+RL sim: s0+s2 output median 102k vs the base's 140k, GPU 74% idle in the last 3 h) and lost 3.82 of its 6.67 points on the 53 tasks where s0 and s2 both pass train but disagree, so the informed extra also fires on disagreement; on the x35+RL sim the rule selects 82 tasks (56 without an extra today) covering 5.28 of the 6.67 lost points. Previous note: 10-31 (x35-base G4 sim analysis: all 17.33 lost points had no correct candidate file; 11.67 of them are tasks where s0 and s2 both pass train and are both wrong, and 17 of those 18 tasks had an s2 solution2 with s0+s2 output median 278k vs 101k for the right ones) = x35-full with extra_solvers.prompts \"ind\" (s3 / s4 on v4ydual: they may hand in solution2.py, which the harness already collected) and extra_solvers.informed {min_output_tokens 150000 (57 of 240 tasks in the x35-base sim, 11 of its 12 lost both-pass tasks), prompts v4yinf} (when s0 and s2 both pass train, s2 has a differing train-passing second answer and their output tokens together reach the threshold, the first extra solver starts with both REPORT.md files in previous/ and is asked for a different reading; it is not counted in decided() and the refiner brief says it read them). Previous note: 10-30 (improvement plan docs/plans/arc2_harness_improvements_20261030.md, user: do all of it) = ...-x34-full.json with: solvers on prompts v4y / v4ydual (REPORT.md for the refiner, required: solver_report; v4ydual's solution2.py the strongest rival; answer files named one by one), refiners on v4refine (every candidate when extra solvers ran, Occam / relative rules, train-pass is not test-right, train-output invariants, a small edit is not another reading, attempt_2 the strongest rival, explicit final/ file names, its own compact prompt) with a repair session of refine_repair_tokens 8,000 when final/ is unfinished at the stop; budget_extension idle: s0, s2, s3, s4 that reach the soft line while nothing is queued and they do not pass train get one more 68k; extra_solvers tail: an undecided task whose refine_exp ends while nothing is queued gets the next extra solver and the re-refiner waits for it; wrapup_time_seconds 900: the wrap-up message 15 min before the wall / deadline. The server context goes 153,600 -> 179,968 with ARC_THINK_BUDGET 49,152 in the builder preset (user 10-31, after 262,080 died of CUDA OOM at the Kaggle L4 vision-peak gate; the think budget keeps one response from pushing the history past what a compaction request fits in; codex stays 150k / 100k). Previous note: 10-29 (user: a 12 h Save & Run of x34) = ...-x34 without extra_solvers_saverun, so a rerun-like Save & Run (240 tasks, 700 min) runs the competition thresholds. Previous note: 10-29 (user: hard tasks that s0/s2 cannot crack get s3/s4; the slots easy tasks leave go to them) = ...-p8-reattach with extra_solvers: a running s0/s2/extra solver past 80k output tokens with no train-passing check.py yet is flagged (b200b eval120fix v3y 8 rounds: such sessions end fully correct 48.7% vs 81.7% overall; they hold 58% of the final failures); a flagged s0 moves its task's s2 to the front; a task with a flagged session and no train-passing candidate gets ind3 (__s8), and ind4 (__s9) once ind3 is flagged or done, also after s0/s2 (and ind3) all finish without passing train. Extra solvers rank ahead of ordinary s2 (they need the runway), at most 32 run at once, same prompts as s0; soft budget = min(200k, per-stream rate x time to the refiner cutoff (deadline - 5400 s, the ext300 refiner reserve 4500 + 900) - 32k wrap-up), not opened under 60k, wall clamped to the cutoff. refine_exp waits for them and takes the best two of s0/s2/extras as A/B (prompts unchanged); the submission's fill uses every solver. extra_solvers_saverun (Save & Run only, kaggle_run passes it with --solutions): 10k trigger, 600 s cutoff, 12k min budget and wrap-up, so the 80-minute run exercises every path. Previous note: Kaggle AGI-2 10-29 = kaggle-l4-seq-c150k-wrap-w9h-dual-idlefix-ext300-v10-skipagree.json with two additions and nothing else changed (auto_compact_token_limit stays 100000): (1) driver_config features.server_reasoning_included=true (codex p8 patch 0008: the context check no longer adds the reasoning before the last user message a second time; needs codex p8, threerabbits/arcforge-codex-0154-p8, sha256 3b4dc034...; p7 refuses the key under --strict-config); (2) reattach_images=true (model_proxy.ImageReattach: codex keeps only the input_text of the kickoff message after a compaction and drops the puzzle images; the proxy puts the whole message back; each episode kind recognises its own kickoff; the fresh-thread hand-off after a context overflow is not re-attached). Previous note: Kaggle AGI-2 10-27 (user: bring the frozen toolkit arc_v10 + prompts v3y, and skip agreed re-refiners) = kaggle-l4-seq-c150k-wrap-w9h-dual-idlefix-ext300.json (57640701) with: workspace arc.py = arc_v10.py and TOOLS.md = arc_v10_TOOLS.md (the arc2 harness loop's toolkit frozen for RL: v3y 8 rounds on eval120fix -0.04 [-2.19,+2.16] vs base at -5.1% tokens); s0 prompts v3y, s2 v3ydual (v3dual's two solution2 paragraphs, compact prompt and wrap-up on v3y); refiners stay on v3refine-dual; workspace_pythonpath (fence posix: PYTHONPATH = pyshadow:workspace, so scripts in /tmp import arc; v3w 174 'No module named arc' in 8 rounds, v3y 0); rerefine_skip_agreed (no re-refiner when s0 and s2 pass train and s0, s2 and refine_exp's own attempt_1 agree). Previous note: kaggle-l4-seq-c150k-wrap-w9h-dual-idlefix.json (57603104, public 84.31) with one change (user 2026-10-25: give hard tasks a longer solver budget). budget_extension: when an s0 episode passes its 200,000-token budget, the harness asks a time gate (run_arc2_seq.extension_decision: the episode's own average output rate so far gives the time for 68,000 more tokens; granted when the episode wall still holds it plus 900 s and the deadline still leaves it plus a 4,500 s refiner reserve plus 900 s). Granted: no wrap-up at 200,000; the budget moves to 268,000 (budget.txt shows it; no message is injected, because codex patch 0005 injects once per context window and the wrap-up must still get in), the wrap-up comes at 268,000 and the hard stop at 300,000. Denied, s2 and the refiners: as before (200,000 + 32,000). Why s0 only and 300k: on the three uncapped b200b eval120 runs (10-23) 56-73% of the points the final submission missed are on tasks with a budget-hit solver; G4 uncapped runs solved several of them at 250-450k; a C128 Kaggle schedule simulation with a harder (Kaggle-like) task mix puts the cost of 300k for s0 at ~0 (s0 starts first) and 400k past the 9 h wall at ~12 tok/s per stream. The proxy also treats a response cut at the context edge (input + output within 256 of the context) and a 'longer than the context' failure as context full, so codex's same-thread resends (10-24 pod: 4/600 episodes, one 13 x 290 s) become a fresh thread. Previous note: kaggle-l4-seq-c150k-wrap-w9h-dual.json with two changes (10-24). (1) codex stream_idle_timeout_ms 32,400,000 = the 9 h episode wall (default 300,000): the 12 h C128 Save & Run collapsed from ~2 h on 2,597 'idle timeout waiting for SSE' resends (sglang holds compaction summaries until response.completed; 171-290 s at C128); the harness wall and deadline still stop every episode. (2) driver_env_extra _RJEM_MALLOC_CONF narenas:1,dirty_decay_ms:0,muzzy_decay_ms:0 for codex's jemalloc (default narenas 4 x CPUs): PC mock, 200 tool turns, codex anon 84-86 -> 39 MB, same time; pod codex ran 90-135 MB x 128. Base: kaggle-l4-seq-c150k-wrap.json (codex2wr, 7f23625) with four changes (user 2026-10-24, for the C128 L4 submission). (1) task_wall_seconds 32,400 (was 21,600): a Kaggle rerun schedule simulation over the student-trajectory QAD R eval120 run (480 episodes, Kaggle scheduling rules, rate calibrated to the 10-22 Save & Run) has C128 solvers that use their whole budget hit the 6 h wall once the per-stream rate is 0.8x the Save & Run one; 9 h removes those wall stops in every slowed scenario; the 700-minute deadline still caps every episode. (2) ind_prompts v3dual: s2 runs prompts v3dual (v3 plus an optional self-contained solution2.py for a second reading that passes every training pair; docs/research/arc2_dual_solver_20261023.md); s0 stays v3. (3) second_solution solution2.py: the harness harvests it from s0 / s2 like solution.py; it counts only when it passes every training pair, and only where its output differs from the episode's first answer. (4) refine_prompts v3refine-dual: the refiners see each candidate's second answer (candidates/<X>/test_J_output2.json, check.txt) and the summary in the brief; the ind fallback and the refiners' fill take second answers after both solvers' first answers. The rest as in the base config: Kaggle L4x4 two attempts per task + wrap-up + re-refiner filler (user 2026-10-13) = kaggle-l4-seq-c150k.json (the 57109034 submission's config: s0 + s2 at 200,000 output tokens, refiner refine_exp at 100,000, --solvers-first, each episode on the least busy DP, posix fence without netns, window 150,000 / compact 100,000, xhigh, prompts v3) with three changes. (1) No 65k midpoint reminder: it was added for a 100k cap without compaction, never measured a gain (G4 v5 vs v3c +14/-12), and now fires in every context window saying 'half the budget' at about a quarter. (2) wrapup_tokens 32,000: when the 200,000 budget is used, the proxy's response-end hook writes the wrap-up message (prompts v3/wrapup.md: write the best rule into solution.py, run check.py, write notes.md, stop) into codex's compact_reminder, and patch 0005 injects it into the running turn at the next follow-up -- same thread, same effort, prefix cache kept; the proxy stops the session at 232,000. Refiners get half (16,000, prompts v3refine/wrapup.md: fill final/). 32,000 because the response crossing the line still has 9.8k to go on average (b200 eval120 x2, 10,311 solver responses; token-weighted p90 response 51k). features.pre_compact_reminder stays on (the wrap-up uses it). (3) task_wall_seconds 21,600 (was 14,400): about 15 tok/s per stream at C96 makes 232,000 about 4.3 h. kaggle_run adds the re-refiner filler (rerefine: an independent second refine_exp in slots the main line can no longer use; while main episodes remain only with --filler-guard 7,200 s left to the deadline -- they take no slot but slow every step of the main line's tail, and a 60-minute guard cut 1-5 more main episodes in the 10-13 schedule simulation -- and --filler-min-left 3,600 s once the main line is done) and submits refine_vote (refine_exp and the re-refiner voted, a1 two votes, a2 one). max_failures 9 as before.",
+ "schema_version": 1,
+ "concurrency": null,
+ "fence": "posix",
+ "effort": "xhigh",
+ "model_context_window": 150000,
+ "auto_compact_token_limit": 100000,
+ "output_token_budget": 200000,
+ "task_wall_seconds": 32400,
+ "max_sessions": 3,
+ "min_resume_tokens": 10000,
+ "prompts": "v4y",
+ "driver_config": {
+  "model_input_modalities": "[\"text\",\"image\"]",
+  "features.sglang_session_release": "true",
+  "features.compaction_reuse_prefix": "true",
+  "features.compaction_strip_analysis": "true",
+  "model_providers.local.stream_max_retries": "12",
+  "model_providers.local.request_max_retries": "12",
+  "features.pre_compact_reminder": "true",
+  "model_providers.local.stream_idle_timeout_ms": "32400000",
+  "features.server_reasoning_included": "true"
+ },
+ "process_data_max": "6G",
+ "game_memory_max": "8G",
+ "watchdog_headroom": "12G",
+ "watchdog_cpu_seconds": 900,
+ "oom_score_adj": 1000,
+ "net_probe": "",
+ "uid_base": 31000,
+ "budget_poll_seconds": 5,
+ "heartbeat_seconds": 60,
+ "keep_driver_home": true,
+ "model_error_wait_seconds": 1800,
+ "max_failures": 9,
+ "reattach_images": true,
+ "network_namespace": false,
+ "workspace_helper": true,
+ "midpoint_reminder_tokens": null,
+ "best_snapshot": true,
+ "view": "text",
+ "check_call_limit": null,
+ "wrapup_tokens": 32000,
+ "ind_prompts": "v4ydual",
+ "refine_prompts": "v4refine",
+ "second_solution": "solution2.py",
+ "driver_env_extra": {
+  "_RJEM_MALLOC_CONF": "narenas:1,dirty_decay_ms:0,muzzy_decay_ms:0"
+ },
+ "budget_extension": {
+  "extra_tokens": 68000,
+  "kinds": [
+   "first"
+  ],
+  "refine_reserve_seconds": 4500,
+  "margin_seconds": 900,
+  "idle": {
+   "kinds": [
+    "first",
+    "ind",
+    "ind3",
+    "ind4"
+   ],
+   "max_grants": 1
+  }
+ },
+ "workspace_helper_file": "arc_v10.py",
+ "workspace_doc_file": "arc_v10_TOOLS.md",
+ "workspace_pythonpath": true,
+ "rerefine_skip_agreed": true,
+ "extra_solvers": {
+  "max_per_task": 2,
+  "trigger_tokens": 80000,
+  "min_budget": 60000,
+  "refine_reserve_seconds": 7200,
+  "max_running": 48,
+  "poll_seconds": 60,
+  "wrapup_tokens": 32000,
+  "tail": true,
+  "prompts": "ind",
+  "informed": {
+   "min_output_tokens": 100000,
+   "prompts": "v4yinf",
+   "disagree": true
+  },
+  "reserve_queued": true,
+  "retry_hold_seconds": 900,
+  "agreement": {
+   "min_output_tokens": 0,
+   "max_budget": 100000,
+   "blocking": false,
+   "max_inflight": 24
+  },
+  "undecided": true,
+  "retry_hold_on": [
+   "backlog"
+  ],
+  "estimator": {
+   "priors": "priors/rl_r4v30.json",
+   "shrink_n0": 200,
+   "m_clip": [
+    0.8,
+    2.0
+   ]
+  },
+  "blocking_until_seconds": 14400
+ },
+ "solver_report": "REPORT.md",
+ "refine_repair_tokens": 8000,
+ "wrapup_time_seconds": 900
+}

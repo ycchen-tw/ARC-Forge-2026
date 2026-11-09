@@ -1,0 +1,9 @@
+# codex 0.154.0 musl static; base TAG=rust-v0.154.0 REF=6b9826e3aa83b1a5947db50f4332cb9c65f1b340 REPO=https://github.com/openai/codex.git
+6304a4938b4896d9a463b73876ff426db81a663af2f7be9e3e1a8805b367531f  0001-view-video-tool.patch
+f5339ee1fdc9fe38de0598bca2d918c4c1e8f6b16916edfdd59744e2d0a804e0  0002-sglang-session-release.patch
+4aca4022a0e16181e315293ce5f612df1982eb86d4590ae6cee880739d07af64  0003-compaction-reuse-prefix.patch
+44ded311bc5bcfdd4f98fa30b471a1b0470e71dce147f861caa587e208000e8b  0004-external-compact-request.patch
+433d64cc74341b7286e53d55886255a64a2e7375007c527e93ac925c4a1bd86e  0005-pre-compact-reminder.patch
+44149f4a219e9ca34483e508b915621e4cbdb189bb52f153d805a975ce43571d  0006-compaction-drops-reminder.patch
+ecb968acb49314d4170eb1c6099bc3f832d5c921543a9089c06d9c33abc3c778  0007-real-token-truncation.patch
+51802c060c348752db69cb6de9577375e178977c51146d890580198ee748255d  0008-server-reasoning-included.patch

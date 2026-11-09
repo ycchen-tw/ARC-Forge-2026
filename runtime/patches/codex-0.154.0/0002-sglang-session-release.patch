@@ -1,0 +1,416 @@
+diff --git a/codex-rs/codex-api/src/common.rs b/codex-rs/codex-api/src/common.rs
+index a2c9c5a..938319a 100644
+--- a/codex-rs/codex-api/src/common.rs
++++ b/codex-rs/codex-api/src/common.rs
+@@ -304,6 +304,10 @@ pub struct ResponsesApiRequest {
+     pub client_metadata: Option<HashMap<String, String>>,
+     #[serde(skip_serializing_if = "Option::is_none")]
+     pub access_programs: Option<AccessPrograms>,
++    /// sglang `--enable-session-radix-cache` pins this request's KV under the body
++    /// `session_id`; unrelated to Codex's `session_id` header.
++    #[serde(rename = "session_id", skip_serializing_if = "Option::is_none")]
++    pub sglang_session_id: Option<String>,
+ }
+ 
+ impl<'a> From<&'a ResponsesApiRequest> for ResponseCreateWsRequest<'a> {
+diff --git a/codex-rs/codex-api/src/endpoint/responses_websocket.rs b/codex-rs/codex-api/src/endpoint/responses_websocket.rs
+index 95d41e0..a70a234 100644
+--- a/codex-rs/codex-api/src/endpoint/responses_websocket.rs
++++ b/codex-rs/codex-api/src/endpoint/responses_websocket.rs
+@@ -979,6 +979,7 @@ mod tests {
+                 "traceparent".to_string(),
+                 "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01".to_string(),
+             )])),
++            sglang_session_id: None,
+         };
+         let request = ResponsesWsRequest::ResponseCreate(ResponseCreateWsRequest {
+             previous_response_id: Some("resp-1".to_string()),
+diff --git a/codex-rs/codex-api/tests/clients.rs b/codex-rs/codex-api/tests/clients.rs
+index af43022..5973e26 100644
+--- a/codex-rs/codex-api/tests/clients.rs
++++ b/codex-rs/codex-api/tests/clients.rs
+@@ -355,6 +355,7 @@ async fn responses_client_stream_request_preserves_item_ids() -> Result<()> {
+         text: None,
+         client_metadata: None,
+         access_programs: None,
++        sglang_session_id: None,
+     };
+     let expected = serde_json::to_value(&request)?;
+ 
+@@ -443,6 +444,7 @@ async fn streaming_client_retries_on_transport_error() -> Result<()> {
+         text: None,
+         client_metadata: None,
+         access_programs: None,
++        sglang_session_id: None,
+     };
+     let client = ResponsesClient::new(transport.clone(), provider, Arc::new(NoAuth));
+ 
+@@ -564,6 +566,7 @@ async fn azure_store_sends_ids_and_headers() -> Result<()> {
+         text: None,
+         client_metadata: None,
+         access_programs: None,
++        sglang_session_id: None,
+     };
+ 
+     let mut extra_headers = HeaderMap::new();
+diff --git a/codex-rs/core/src/client.rs b/codex-rs/core/src/client.rs
+index a813022..c9309f3 100644
+--- a/codex-rs/core/src/client.rs
++++ b/codex-rs/core/src/client.rs
+@@ -173,6 +173,8 @@ const RESPONSES_COMPACT_ENDPOINT: &str = "/responses/compact";
+ // period between stream events.
+ const COMPACT_REQUEST_TIMEOUT_IDLE_MULTIPLIER: u32 = 4;
+ const MEMORIES_SUMMARIZE_ENDPOINT: &str = "/memories/trace_summarize";
++// A failed close only leaves KV pinned until eviction; don't stall compaction or shutdown on it.
++const SGLANG_CLOSE_SESSION_TIMEOUT: Duration = Duration::from_secs(5);
+ #[cfg(test)]
+ pub(crate) const WEBSOCKET_CONNECT_TIMEOUT: Duration =
+     Duration::from_millis(DEFAULT_WEBSOCKET_CONNECT_TIMEOUT_MS);
+@@ -261,6 +263,8 @@ pub struct ModelClient {
+     free_guardian_enabled: bool,
+     event_sender: Option<Sender<ProtocolEvent>>,
+     http_client_factory: HttpClientFactory,
++    /// Set iff `sglang_session_release` is enabled.
++    sglang_close_session_url: Option<String>,
+ }
+ 
+ /// A turn-scoped streaming session created from a [`ModelClient`].
+@@ -333,6 +337,7 @@ fn responses_request_properties_match(
+         text: previous_text,
+         client_metadata: _,
+         access_programs: _,
++        sglang_session_id: previous_sglang_session_id,
+     } = previous;
+     let ResponsesApiRequest {
+         model: current_model,
+@@ -351,6 +356,7 @@ fn responses_request_properties_match(
+         text: current_text,
+         client_metadata: _,
+         access_programs: _,
++        sglang_session_id: current_sglang_session_id,
+     } = current;
+ 
+     previous_model == current_model
+@@ -367,6 +373,25 @@ fn responses_request_properties_match(
+         && previous_service_tier == current_service_tier
+         && previous_prompt_cache_key == current_prompt_cache_key
+         && previous_text == current_text
++        && previous_sglang_session_id == current_sglang_session_id
++}
++
++/// sglang serves `/close_session` at the server root while the provider base URL points at
++/// its OpenAI-compatible `/v1` prefix.
++pub(crate) fn sglang_close_session_url(
++    base_url: Option<&str>,
++) -> std::result::Result<String, String> {
++    base_url
++        .and_then(|base_url| {
++            let base_url = base_url.strip_suffix('/').unwrap_or(base_url);
++            base_url.strip_suffix("/v1")
++        })
++        .map(|root| format!("{root}/close_session"))
++        .ok_or_else(|| {
++            format!(
++                "feature `sglang_session_release` needs a provider base_url ending in `/v1`, got {base_url:?}"
++            )
++        })
+ }
+ 
+ fn response_items_equal_ignoring_internal_metadata(
+@@ -483,9 +508,42 @@ impl ModelClient {
+             free_guardian_enabled: false,
+             event_sender: None,
+             http_client_factory,
++            sglang_close_session_url: None,
+         }
+     }
+ 
++    pub(crate) fn with_sglang_close_session_url(
++        mut self,
++        sglang_close_session_url: Option<String>,
++    ) -> Self {
++        self.sglang_close_session_url = sglang_close_session_url;
++        self
++    }
++
++    /// Unpins `window_id` in sglang's session radix cache. Returns `None` when
++    /// `sglang_session_release` is off.
++    pub(crate) async fn close_sglang_session(
++        &self,
++        window_id: &str,
++    ) -> Option<std::result::Result<(), String>> {
++        let url = self.sglang_close_session_url.as_deref()?;
++        let client =
++            match create_client_for_route(&self.http_client_factory, url, ClientRouteClass::Api) {
++                Ok(client) => client,
++                Err(err) => return Some(Err(err.to_string())),
++            };
++        let result = client
++            .post(url)
++            .timeout(SGLANG_CLOSE_SESSION_TIMEOUT)
++            .json(&serde_json::json!({ "session_id": window_id }))
++            .send()
++            .await
++            .and_then(codex_http_client::HttpResponse::error_for_status)
++            .map(|_| ())
++            .map_err(|err| err.to_string());
++        Some(result)
++    }
++
+     pub(crate) fn with_free_guardian_enabled(mut self, free_guardian_enabled: bool) -> Self {
+         self.free_guardian_enabled = free_guardian_enabled;
+         self
+@@ -992,6 +1050,12 @@ impl ModelClient {
+             text,
+             client_metadata: Some(responses_metadata.client_metadata()),
+             access_programs: None,
++            // Same string as the `x-codex-window-id` header, so each compaction window gets its
++            // own sglang session.
++            sglang_session_id: self
++                .sglang_close_session_url
++                .as_ref()
++                .map(|_| responses_metadata.window_id.clone()),
+         };
+         Ok(request)
+     }
+diff --git a/codex-rs/core/src/client_common_tests.rs b/codex-rs/core/src/client_common_tests.rs
+index 1c8625a..e3965be 100644
+--- a/codex-rs/core/src/client_common_tests.rs
++++ b/codex-rs/core/src/client_common_tests.rs
+@@ -135,6 +135,7 @@ fn serializes_text_verbosity_when_set() {
+         }),
+         client_metadata: None,
+         access_programs: None,
++        sglang_session_id: None,
+     };
+ 
+     let v = serde_json::to_value(&req).expect("json");
+@@ -180,6 +181,7 @@ fn serializes_text_schema_with_strict_format() {
+         text: Some(text_controls),
+         client_metadata: None,
+         access_programs: None,
++        sglang_session_id: None,
+     };
+ 
+     let v = serde_json::to_value(&req).expect("json");
+@@ -242,6 +244,7 @@ fn omits_text_when_not_set() {
+         text: None,
+         client_metadata: None,
+         access_programs: None,
++        sglang_session_id: None,
+     };
+ 
+     let v = serde_json::to_value(&req).expect("json");
+@@ -267,6 +270,7 @@ fn serializes_flex_service_tier_when_set() {
+         text: None,
+         client_metadata: None,
+         access_programs: None,
++        sglang_session_id: None,
+     };
+ 
+     let v = serde_json::to_value(&req).expect("json");
+diff --git a/codex-rs/core/src/client_tests.rs b/codex-rs/core/src/client_tests.rs
+index 348d169..cae516f 100644
+--- a/codex-rs/core/src/client_tests.rs
++++ b/codex-rs/core/src/client_tests.rs
+@@ -351,6 +351,52 @@ fn responses_lite_prefix_ids_track_thread_and_payload() -> anyhow::Result<()> {
+     Ok(())
+ }
+ 
++#[test]
++fn sglang_session_id_follows_window_id_only_when_enabled() -> anyhow::Result<()> {
++    let client = test_model_client(SessionSource::Cli);
++    let window_id = format!("{}:3", client.state.thread_id);
++    let build = |client: &ModelClient| {
++        client.build_responses_request(
++            &Prompt::default(),
++            &test_model_info(),
++            /*effort*/ None,
++            codex_protocol::config_types::ReasoningSummary::None,
++            /*service_tier*/ None,
++            &test_responses_metadata_for_client(
++                client,
++                /*turn_id*/ None,
++                window_id.clone(),
++                /*parent_thread_id*/ None,
++                TestCodexResponsesRequestKind::Turn,
++            ),
++        )
++    };
++
++    let off = serde_json::to_value(build(&client)?)?;
++    assert_eq!(off.get("session_id"), None);
++
++    let client = client
++        .with_sglang_close_session_url(Some("http://127.0.0.1:30000/close_session".to_string()));
++    let on = serde_json::to_value(build(&client)?)?;
++    assert_eq!(on["session_id"], serde_json::json!(window_id));
++    Ok(())
++}
++
++#[test]
++fn sglang_close_session_url_strips_one_v1_suffix() {
++    assert_eq!(
++        super::sglang_close_session_url(Some("http://127.0.0.1:30044/v1")),
++        Ok("http://127.0.0.1:30044/close_session".to_string())
++    );
++    assert_eq!(
++        super::sglang_close_session_url(Some("http://127.0.0.1:30044/v1/")),
++        Ok("http://127.0.0.1:30044/close_session".to_string())
++    );
++    assert!(super::sglang_close_session_url(Some("http://127.0.0.1:30044")).is_err());
++    assert!(super::sglang_close_session_url(Some("http://127.0.0.1:30044/v1/v2")).is_err());
++    assert!(super::sglang_close_session_url(/*base_url*/ None).is_err());
++}
++
+ fn test_session_telemetry() -> SessionTelemetry {
+     SessionTelemetry::new(
+         ThreadId::new(),
+diff --git a/codex-rs/core/src/compact.rs b/codex-rs/core/src/compact.rs
+index 4aacc97..9aee7ec 100644
+--- a/codex-rs/core/src/compact.rs
++++ b/codex-rs/core/src/compact.rs
+@@ -370,6 +370,8 @@ async fn run_compact_task_inner_impl(
+         // belongs to this compaction turn.
+         summary_item.set_turn_id_if_missing(&turn_context.sub_id);
+     }
++    // The summarization request above still belonged to this window.
++    let old_window_id = sess.current_window_id().await;
+     let (window_number, window_ids) = sess.advance_auto_compact_window().await;
+ 
+     let (initial_context, world_state_baseline) =
+@@ -397,6 +399,8 @@ async fn run_compact_task_inner_impl(
+         },
+     )
+     .await;
++    sess.release_sglang_session(&turn_context.sub_id, &old_window_id)
++        .await;
+     sess.recompute_token_usage(&turn_context).await;
+ 
+     sess.emit_turn_item_completed(&turn_context, compaction_item)
+diff --git a/codex-rs/core/src/session/handlers.rs b/codex-rs/core/src/session/handlers.rs
+index aa7c997..282290d 100644
+--- a/codex-rs/core/src/session/handlers.rs
++++ b/codex-rs/core/src/session/handlers.rs
+@@ -444,6 +444,9 @@ pub(super) async fn emit_thread_stop_lifecycle(sess: &Session) {
+ 
+ pub async fn shutdown(sess: &Arc<Session>, sub_id: String) -> bool {
+     shutdown_session_runtime(sess).await;
++    // Tasks are aborted by now, so nothing can extend the current window after the close.
++    let window_id = sess.current_window_id().await;
++    sess.release_sglang_session(&sub_id, &window_id).await;
+     info!("Shutting down Codex instance");
+     let history = sess.clone_history().await;
+     let turn_count = history
+diff --git a/codex-rs/core/src/session/mod.rs b/codex-rs/core/src/session/mod.rs
+index 8ffc144..d9f8aca 100644
+--- a/codex-rs/core/src/session/mod.rs
++++ b/codex-rs/core/src/session/mod.rs
+@@ -4199,6 +4199,27 @@ impl Session {
+         )
+     }
+ 
++    /// Unpins `window_id` in sglang's session radix cache once this thread no longer extends
++    /// that window. A failed close only costs cache residency, so it warns instead of failing
++    /// the turn; `EventMsg::Error` would make `codex exec` exit non-zero.
++    pub(crate) async fn release_sglang_session(&self, sub_id: &str, window_id: &str) {
++        let Some(Err(err)) = self
++            .services
++            .model_client
++            .close_sglang_session(window_id)
++            .await
++        else {
++            return;
++        };
++        let message = format!("sglang close_session for {window_id} failed: {err}");
++        error!("{message}");
++        self.send_event_raw(Event {
++            id: sub_id.to_string(),
++            msg: EventMsg::Warning(WarningEvent { message }),
++        })
++        .await;
++    }
++
+     pub(crate) async fn advance_auto_compact_window(&self) -> (u64, AutoCompactWindowIds) {
+         let mut state = self.state.lock().await;
+         state.advance_auto_compact_window()
+@@ -4237,6 +4258,7 @@ impl Session {
+             } else {
+                 Vec::new()
+             };
++        let old_window_id = self.current_window_id().await;
+         let window = {
+             let mut state = self.state.lock().await;
+             state.start_new_context_window()
+@@ -4263,6 +4285,8 @@ impl Session {
+             },
+         )
+         .await;
++        self.release_sglang_session(&turn_context.sub_id, &old_window_id)
++            .await;
+         self.recompute_token_usage(turn_context).await;
+         window_number
+     }
+diff --git a/codex-rs/core/src/session/session.rs b/codex-rs/core/src/session/session.rs
+index a3e6b17..46089f3 100644
+--- a/codex-rs/core/src/session/session.rs
++++ b/codex-rs/core/src/session/session.rs
+@@ -682,6 +682,12 @@ impl Session {
+                 .model(),
+             session_configuration.provider
+         );
++        let sglang_close_session_url = if config.features.enabled(Feature::SglangSessionRelease) {
++            let base_url = session_configuration.provider.info().base_url.as_deref();
++            Some(crate::client::sglang_close_session_url(base_url).map_err(anyhow::Error::msg)?)
++        } else {
++            None
++        };
+         let base_instructions_provenance = if config.base_instructions.is_some() {
+             Some(
+                 config
+@@ -1483,6 +1489,7 @@ impl Session {
+                     config.http_client_factory(),
+                 )
+                 .with_free_guardian_enabled(config.free_guardian_enabled())
++                .with_sglang_close_session_url(sglang_close_session_url)
+                 .with_session_context(
+                     crate::guardian::prompt_cache_key_override_for_review_session(
+                         &session_configuration.session_source,
+diff --git a/codex-rs/ext/guardian-v2/src/async_scorer/sampler.rs b/codex-rs/ext/guardian-v2/src/async_scorer/sampler.rs
+index 993e2d4..4fdf35a 100644
+--- a/codex-rs/ext/guardian-v2/src/async_scorer/sampler.rs
++++ b/codex-rs/ext/guardian-v2/src/async_scorer/sampler.rs
+@@ -362,6 +362,7 @@ impl LunaSampler {
+             text: None,
+             client_metadata: None,
+             access_programs: None,
++            sglang_session_id: None,
+         };
+         let (supersede, mut superseded) = oneshot::channel();
+         let scored = Arc::new(AtomicBool::new(false));
+diff --git a/codex-rs/features/src/lib.rs b/codex-rs/features/src/lib.rs
+index 003a4a6..a891566 100644
+--- a/codex-rs/features/src/lib.rs
++++ b/codex-rs/features/src/lib.rs
+@@ -110,6 +110,8 @@ pub enum Feature {
+     // Experimental
+     /// Send per-content-entry classifications in internal Responses metadata.
+     ContentItemKinds,
++    /// Tag Responses requests with an sglang session id and close it when the window retires.
++    SglangSessionRelease,
+     /// Record model-attempted tool calls in internal Responses metadata.
+     ExecutedToolCallMetadata,
+     /// Enable JavaScript code mode backed by the standalone host process.
+@@ -1009,6 +1011,12 @@ pub const FEATURES: &[FeatureSpec] = &[
+         stage: Stage::Stable,
+         default_enabled: true,
+     },
++    FeatureSpec {
++        id: Feature::SglangSessionRelease,
++        key: "sglang_session_release",
++        stage: Stage::UnderDevelopment,
++        default_enabled: false,
++    },
+     FeatureSpec {
+         id: Feature::ExecutedToolCallMetadata,
+         key: "executed_tool_call_metadata",

@@ -1,0 +1,25 @@
+{
+  "dataset": "threerabbits/qwen38fn-dflash-planb-l8-s25562-fp8",
+  "export_dir": "",
+  "dense": 10880,
+  "architecture": {
+    "residual": "plain",
+    "context": "inject",
+    "ffn_type": "dense"
+  },
+  "source": "Plan B MTP5-DFlash drafter trained on b200b: 8 layers, plain residual (one stream, pre-norm), injected context, one dense MLP of 10880 (ffn_type dense), mask_gr none; final step 25562 of b200b run 20261020-l8-codexmix (2.248B anchors; held-out E 3.703 vs D-line ext9425 +2.3%; B200 replay AL FP8 +1.3% over the D line), deploy FP8 as step 16000 (config.json identical to s16000's). Kaggle dataset uploaded 10-21 from b200b (the AGI-3 v30 drafter). Hashes are the dataset's own SHA256SUMS (downloaded 10-22). Served by fork main all-merge-1020 a5c67c41cd.",
+  "files_sha256": {
+    "config.json": "dac2f6629f0b4848d679f9a5d6bc4b71cf790ba7ee0e089cd1f39de2a12fe5b6",
+    "conversion_manifest.json": "fbca160cbca825d175361335e672fdb3e24cb236ef9e169fdb5164ca7ac2f588",
+    "initialization_manifest.json": "495e31492e3b6d50c18e6d61b286b92fb2d011eeafad027475f9d6b4259c6245",
+    "interface.safetensors": "594dd23cadb221e2ae3bd25a4766f49dabd8894b2cb6687431582d8ec4848d5e",
+    "layer-0.safetensors": "4473fb56da27d774661d8587fb3ffe98599f38462b289e87969af5f01dcc92f8",
+    "layer-1.safetensors": "de5b91df8a3195ba3027e1e2d6d349f10b8ce34658658d2a0c14978a1549a6a1",
+    "layer-2.safetensors": "e28d83c418f0e7f858af1a5af01aa03808b99ab8911463281b83f75074fda166",
+    "layer-3.safetensors": "e40694ae11d79e86b8566b345280c39874d4c5ebbd35ed13db7cd308cf210190",
+    "layer-4.safetensors": "4aa0a5676d83432898a4058471a977dfae9359e2490bcb3eda15ed1e202af81a",
+    "layer-5.safetensors": "ed4913554cff1c4dd928799b93e230ad74a951b89fd966ff898a9db62a0bf581",
+    "layer-6.safetensors": "46360a44cc9d5f6dc15cd42eee33b5ec34bdfcbfaff6d68242e61e1882950631",
+    "layer-7.safetensors": "1a0b815816b89b49d0533f6d2dde6b1c947af215891c3a4056edb10d7b6cae17"
+  }
+}

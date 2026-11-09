@@ -1,0 +1,18 @@
+{
+ "model_dir": "$ARC_NFS/models/Qwen3.8-Flash-Next-FP8",
+ "context_length": 262144,
+ "instances": [
+  {
+   "name": "node1-p30241-20261005T205435-2524457",
+   "path": "$ARC_RAM_RUNS/qwen38fn_eval/20261009-reap-mm/ledger/node1-p30241-20261005T205435-2524457",
+   "server_json_sha256": "64c809b0c1deb0c5145c9c1f4766453d70816ad102051a4a81157203350cf609"
+  },
+  {
+   "name": "node1-p30242-20261005T211903-2542675",
+   "path": "$ARC_RAM_RUNS/qwen38fn_eval/20261009-reap-mm/ledger/node1-p30242-20261005T211903-2542675",
+   "server_json_sha256": "e1997ffc6d649796ee5ff13a8cf229af890a496d213ece203d071f269761b9d3"
+  }
+ ],
+ "items": 4639,
+ "items_sha256": "40cf91736f2dd74eeb214e28de37b9c6d52daae20d7667e379006a68b5b766aa"
+}

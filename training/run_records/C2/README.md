@@ -1,0 +1,5 @@
+# C2 run record: ARC-AGI-2 RL r4
+Host node1. The final launch started 2026-10-28 22:04Z (replicas) and 22:11Z (orchestrator); the units stopped 2026-10-29 15:40Z to 15:41Z. Rollout replicas r0-r2 on GPUs 0-2, trainer on GPUs 3-5.
+Main command lines: `launch/rl-arc2r4-*.journal.txt` (orchestrator.py --config, replica_control.py, group_pack.py, launch_rollout_server.sh, train_rl_service.sh), from the released work/qwen38fn_rl/launch_arc2_largegrid_int3qat.sh with work/qwen38fn_rl/probes/arc2_ctx64k_20261029/env/arc2-r4.env. `launch/r4-start.txt`: fork lock bdf43e50, serve profile, rollout sampling, drafter, base lineage.
+Resolved configs: `config/config.json`, `config/plan.json`, `config/harness-{train,eval}.json`, `config/trainer-config.json`; task lists `lists/train.txt`, `lists/heldout.txt`.
+The trainer ran the released work/qwen38fn_lora code except the files in `code/`, which are the versions as run. Not in this tree: the rollout fork tree sglang-arc-2-topp; the code otherwise ran from main around 19aba7293 / d2fdda9fd.

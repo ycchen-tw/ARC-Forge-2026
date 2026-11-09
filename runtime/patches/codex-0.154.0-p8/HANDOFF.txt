@@ -1,0 +1,9 @@
+codex 0.154.0 p8 (kverify session on an 8×B200 node, 2026-10-20): rust-v0.154.0 + patches 0001-0008
+  0001 view-video-tool now estimates a video's tokens from its mp4 header (no flag): ceil(frames/2) x (ceil(w/32)*ceil(h/32)+16)
+  0008 server-reasoning-included: features.server_reasoning_included (default off); RL / Kaggle: set "true"
+binary prefix/bin/codex sha256 3b4dc03403070f03c822ff776a980e9afb1e76b7a3d79cb2547ef6f14b68a882
+  musl static-pie, codex-cli 0.154.0; p7 (62ee15a0...) unchanged on that node
+Install: copy prefix/ (and arc2-jail/ if you use the jail wrapper; edit its REAL_PREFIX to where prefix/ lands),
+point ARC_CODEX_PREFIX (and ARC2_JAIL_PREFIX) at it. Switch the binary and the config key together:
+p7 refuses features.server_reasoning_included under strict config.
+Tests and enable notes: README.md

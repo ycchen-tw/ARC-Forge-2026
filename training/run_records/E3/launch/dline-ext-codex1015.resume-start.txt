@@ -1,0 +1,5 @@
+2026-10-18T07:46:37Z GPU 0-3 free (go file: no); /data 97 GiB free; resuming
+· init $ARC_NFS/runs/qwen38fn_mtp_dense/20261011-int3-target47/dline/M_T35_T39_T43_T47-m70-none-init (mask_gr none), plan $ARC_RUNS/qwen38fn_dflash/20261017-codex1015-plan (target node1-p31749-20261017T094258-1018307)
+· gate $ARC_RUNS/qwen38fn_dflash/20261017-codex1015-fast-gate-2/gate-acceptance.json: prefix gate {'version': 'prefix_gate_v3', 'tail_alpha': 0.01, 'gate_temperature': 0.7, 'trust_floor': 0.0, 'ramp': 'none', 'anchor_inclusion': True, 'kl_gated': True}
+Running as unit: dflash-20261017-dline-ext-codex1015-1792309598.service; invocation ID: 4188413f7ae54be982ba610ba274470d
+· dflash-20261017-dline-ext-codex1015-1792309598, pipeline 832721; log $ARC_RUNS/qwen38fn_dflash/20261017-dline-ext-codex1015.pipeline.log

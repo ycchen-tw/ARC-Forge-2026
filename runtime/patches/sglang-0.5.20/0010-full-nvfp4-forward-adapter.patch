@@ -1,0 +1,51 @@
+From 5a79d758e95cab32625b18f4df1cf80a018e59dc Mon Sep 17 00:00:00 2001
+From: arc <a@b.c>
+Date: Sat, 19 Sep 2026 07:37:51 +0000
+Subject: [PATCH 3/7] arc: 0025-full-nvfp4-forward-adapter
+
+(cherry picked from commit d325315e8cced88b7062182ddaba00c2b889cf3c)
+---
+ .../layers/attention/flashinfer_backend.py    | 23 ++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/python/sglang/srt/layers/attention/flashinfer_backend.py b/python/sglang/srt/layers/attention/flashinfer_backend.py
+index ac72c550..69364b87 100644
+--- a/python/sglang/srt/layers/attention/flashinfer_backend.py
++++ b/python/sglang/srt/layers/attention/flashinfer_backend.py
+@@ -65,6 +65,23 @@ if TYPE_CHECKING:
+ logger = logging.getLogger(__name__)
+ 
+ 
++def arc_nvfp4_paged_forward(wrapper, q, kv_cache, *, causal, sm_scale,
++                            window_left, logits_soft_cap, k_scale, v_scale,
++                            kv_cache_sf):
++    """Legacy forward semantics with NVFP4 scales passed to the supported run API."""
++    wrapper._causal = causal
++    wrapper._pos_encoding_mode = "NONE"
++    wrapper._use_fp16_qk_reduction = False
++    wrapper._window_left = window_left
++    wrapper._logits_soft_cap = logits_soft_cap
++    wrapper._sm_scale = sm_scale
++    wrapper._rope_scale = None
++    wrapper._rope_theta = None
++    return wrapper.run(q, kv_cache, k_scale=k_scale, v_scale=v_scale,
++                       kv_cache_sf=kv_cache_sf)
++
++
++
+ if envs.SGLANG_ENABLE_TORCH_COMPILE.get():
+     torch._logging.set_logs(dynamo=logging.ERROR)
+     torch._dynamo.config.suppress_errors = True
+@@ -1360,7 +1377,11 @@ class FlashInferAttnBackend(AttentionBackend):
+                 not layer.is_cross_attention
+                 and layer.attn_type != AttentionType.ENCODER_ONLY
+             )
+-            o = prefill_wrapper_paged.forward(
++            paged_forward = (
++                partial(arc_nvfp4_paged_forward, prefill_wrapper_paged)
++                if self.arc_native_nvfp4 else prefill_wrapper_paged.forward
++            )
++            o = paged_forward(
+                 q.view(-1, layer.tp_q_head_num, layer.head_dim),
+                 kv_cache,
+                 causal=causal,

@@ -1,0 +1,1 @@
+Choose the final two answers for the puzzle described in AGENTS.md; the solvers' work is in candidates/. The {n_images} images attached to this message are the puzzle's grids, in this order: {image_order}. Start now.

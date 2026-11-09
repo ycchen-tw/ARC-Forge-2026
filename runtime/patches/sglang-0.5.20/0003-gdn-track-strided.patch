@@ -1,0 +1,242 @@
+From fbf0e146660044afb7d5c3fc03332fb35ad6262c Mon Sep 17 00:00:00 2001
+From: arc <a@b.c>
+Date: Sat, 19 Sep 2026 08:13:10 +0000
+Subject: [PATCH 3/7] arc: 0008-gdn-track-strided
+
+---
+ .../ops/mamba/mamba_state_scatter_triton.py   | 97 ++++++++++++++++++-
+ .../layers/test_mamba_state_scatter_triton.py | 79 +++++++++++++++
+ 2 files changed, 173 insertions(+), 3 deletions(-)
+
+diff --git a/python/sglang/kernels/ops/mamba/mamba_state_scatter_triton.py b/python/sglang/kernels/ops/mamba/mamba_state_scatter_triton.py
+index 1824fcd9..c5c455c4 100644
+--- a/python/sglang/kernels/ops/mamba/mamba_state_scatter_triton.py
++++ b/python/sglang/kernels/ops/mamba/mamba_state_scatter_triton.py
+@@ -220,11 +220,72 @@ def _fused_mamba_state_scatter_with_mask_kernel(
+     tl.store(dst_ptr + dst_offset + offsets, data, mask=mask)
+ 
+ 
++@triton.jit
++def _fused_mamba_state_scatter_with_mask_strided_kernel(
++    src_ptr,
++    dst_ptr,
++    dst_indices_raw_ptr,
++    step_indices_raw_ptr,
++    elem_per_entry: tl.constexpr,
++    src_layer_stride,
++    src_req_stride,
++    src_step_stride,
++    dst_layer_stride,
++    dst_req_stride,
++    src_req_size,
++    src_step_size,
++    dst_req_size,
++    NUM_BLOCKS: tl.constexpr,
++    NUM_WORKERS: tl.constexpr,
++    BLOCK_SIZE: tl.constexpr,
++):
++    """Copy one entry with a small, fixed number of strided worker CTAs.
++
++    This is intended for the interval-track commit, where almost every request is
++    invalid. Keeping the regular scatter on the one-CTA-per-block kernel avoids
++    slowing its bandwidth-bound copy, while the track launch no longer pays for
++    hundreds of thousands of CTAs that immediately return.
++    """
++    pid_req = tl.program_id(0)
++    pid_layer = tl.program_id(1).to(tl.int64)
++    pid_worker = tl.program_id(2).to(tl.int64)
++
++    step_idx = tl.load(step_indices_raw_ptr + pid_req).to(tl.int64)
++    if step_idx < 0:
++        return
++
++    dst_idx = tl.load(dst_indices_raw_ptr + pid_req).to(tl.int64)
++    src_idx = pid_req
++    if not (
++        (dst_idx >= 0)
++        & (dst_idx < dst_req_size)
++        & (src_idx >= 0)
++        & (src_idx < src_req_size)
++        & (step_idx < src_step_size)
++    ):
++        return
++
++    src_offset = (
++        pid_layer * src_layer_stride
++        + src_idx * src_req_stride
++        + step_idx * src_step_stride
++    )
++    dst_offset = pid_layer * dst_layer_stride + dst_idx * dst_req_stride
++
++    for block_round in range(0, tl.cdiv(NUM_BLOCKS, NUM_WORKERS)):
++        pid_block = pid_worker + block_round * NUM_WORKERS
++        offsets = pid_block * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
++        mask = (pid_block < NUM_BLOCKS) & (offsets < elem_per_entry)
++        data = tl.load(src_ptr + src_offset + offsets, mask=mask)
++        tl.store(dst_ptr + dst_offset + offsets, data, mask=mask)
++
++
+ def fused_mamba_state_scatter_with_mask(
+     dst: torch.Tensor,  # [num_layers, cache_size, *state_shape]
+     src: torch.Tensor,  # [num_layers, spec_size, draft_tokens, *state_shape]
+     dst_indices_raw: torch.Tensor,  # [total_requests] - raw indices (e.g., state_indices_tensor)
+     step_indices_raw: torch.Tensor,  # [total_requests] - raw step indices (step >= 0 means valid)
++    max_ctas_per_entry: int | None = None,
+ ):
+     """
+     Fully fused gather-scatter with built-in masking for mamba state updates.
+@@ -241,6 +302,8 @@ def fused_mamba_state_scatter_with_mask(
+         src: Source tensor [num_layers, spec_size, draft_tokens, *state_shape]
+         dst_indices_raw: Raw destination indices for all requests [total_requests]
+         step_indices_raw: Raw step indices; entry >= 0 means valid [total_requests]
++        max_ctas_per_entry: If set, use at most this many CTAs per entry and
++            stride each CTA over multiple blocks. Intended for sparse track commits.
+     """
+     total_requests = step_indices_raw.shape[0]
+     if total_requests == 0:
+@@ -299,10 +362,35 @@ def fused_mamba_state_scatter_with_mask(
+     # Block size for copying elements
+     BLOCK_SIZE = 1024
+ 
+-    # Grid over all requests - invalid ones will early-exit in the kernel
+-    grid = (total_requests, num_layers, triton.cdiv(elem_per_entry, BLOCK_SIZE))
++    num_blocks = triton.cdiv(elem_per_entry, BLOCK_SIZE)
++    if max_ctas_per_entry is None or num_blocks <= max_ctas_per_entry:
++        # Regular commit: preserve the bandwidth-oriented one-CTA-per-block path.
++        grid = (total_requests, num_layers, num_blocks)
++        _fused_mamba_state_scatter_with_mask_kernel[grid](
++            src,
++            dst,
++            dst_indices_raw,
++            step_indices_raw,
++            elem_per_entry,
++            src_layer_stride,
++            src_req_stride,
++            src_step_stride,
++            dst_layer_stride,
++            dst_req_stride,
++            src_req_size,
++            src_step_size,
++            dst_req_size,
++            BLOCK_SIZE=BLOCK_SIZE,
++        )
++        return
+ 
+-    _fused_mamba_state_scatter_with_mask_kernel[grid](
++    if max_ctas_per_entry <= 0:
++        raise ValueError(
++            f"max_ctas_per_entry must be positive, got {max_ctas_per_entry}"
++        )
++    num_workers = min(max_ctas_per_entry, num_blocks)
++    grid = (total_requests, num_layers, num_workers)
++    _fused_mamba_state_scatter_with_mask_strided_kernel[grid](
+         src,
+         dst,
+         dst_indices_raw,
+@@ -316,6 +404,8 @@ def fused_mamba_state_scatter_with_mask(
+         src_req_size,
+         src_step_size,
+         dst_req_size,
++        NUM_BLOCKS=num_blocks,
++        NUM_WORKERS=num_workers,
+         BLOCK_SIZE=BLOCK_SIZE,
+     )
+ 
+@@ -701,6 +791,7 @@ def scatter_mamba_states_after_mtp_verify(
+                 intermediate_state_cache,
+                 mamba_track_indices,
+                 mamba_steps_to_track,
++                max_ctas_per_entry=8,
+             )
+ 
+     pairs = list(zip(mamba_caches.conv, mamba_caches.intermediate_conv_window))
+diff --git a/test/registered/unit/layers/test_mamba_state_scatter_triton.py b/test/registered/unit/layers/test_mamba_state_scatter_triton.py
+index 145f20fe..fe90ecaf 100644
+--- a/test/registered/unit/layers/test_mamba_state_scatter_triton.py
++++ b/test/registered/unit/layers/test_mamba_state_scatter_triton.py
+@@ -250,6 +250,85 @@ class TestMambaStateScatterCorrectness(unittest.TestCase):
+         torch.testing.assert_close(ssm_fused, ssm_ref)
+         torch.testing.assert_close(conv_fused, conv_ref)
+ 
++    @unittest.skipUnless(torch.cuda.is_available(), "CUDA is required for this test.")
++    def test_sparse_track_strided_matches_regular_and_graph(self):
++        if fused_mamba_state_scatter_with_mask is None:
++            self.skipTest(
++                f"fused_mamba_state_scatter_with_mask import failed: {_FUSED_IMPORT_ERROR}"
++            )
++
++        torch.manual_seed(9)
++        device = torch.device("cuda")
++        layers, batch, slots, steps, elems = 2, 8, 12, 4, 9 * 1024 + 17
++        src = torch.randn(
++            (layers, batch, steps, elems), device=device, dtype=torch.bfloat16
++        )
++        initial = torch.randn(
++            (layers, slots, elems), device=device, dtype=torch.bfloat16
++        )
++        dst_indices = torch.arange(batch, device=device, dtype=torch.int32)
++        step_indices = torch.full(
++            (batch,), -1, device=device, dtype=torch.int32
++        )
++        step_indices[0] = 2
++
++        expected = initial.clone()
++        fused_mamba_state_scatter_with_mask(
++            expected, src, dst_indices, step_indices
++        )
++        actual = initial.clone()
++        fused_mamba_state_scatter_with_mask(
++            actual, src, dst_indices, step_indices, max_ctas_per_entry=8
++        )
++        self.assertTrue(torch.equal(actual, expected))
++
++        # All rejected entries must be skipped without touching memory.
++        bounds_dst = dst_indices.clone()
++        bounds_steps = step_indices.clone()
++        bounds_dst[1:3] = torch.tensor([-1, slots], device=device)
++        bounds_steps[1:4] = torch.tensor([0, 0, steps], device=device)
++        expected = initial.clone()
++        fused_mamba_state_scatter_with_mask(
++            expected, src, bounds_dst, bounds_steps
++        )
++        actual = initial.clone()
++        fused_mamba_state_scatter_with_mask(
++            actual,
++            src,
++            bounds_dst,
++            bounds_steps,
++            max_ctas_per_entry=8,
++        )
++        self.assertTrue(torch.equal(actual, expected))
++
++        # The production caller runs under a captured decode graph.
++        graph_dst = initial.clone()
++        fused_mamba_state_scatter_with_mask(
++            graph_dst,
++            src,
++            dst_indices,
++            step_indices,
++            max_ctas_per_entry=8,
++        )
++        torch.cuda.synchronize()
++        graph_dst.copy_(initial)
++        graph = torch.cuda.CUDAGraph()
++        with torch.cuda.graph(graph):
++            fused_mamba_state_scatter_with_mask(
++                graph_dst,
++                src,
++                dst_indices,
++                step_indices,
++                max_ctas_per_entry=8,
++            )
++        graph.replay()
++        torch.cuda.synchronize()
++        expected = initial.clone()
++        fused_mamba_state_scatter_with_mask(
++            expected, src, dst_indices, step_indices
++        )
++        self.assertTrue(torch.equal(graph_dst, expected))
++
+ 
+ def _make_envelope_views(device="cpu"):
+     """Envelope-strided conv/temporal views, exactly as UnifiedMambaPool /

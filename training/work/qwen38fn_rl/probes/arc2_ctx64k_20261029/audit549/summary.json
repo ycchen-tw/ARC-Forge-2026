@@ -1,0 +1,40 @@
+{
+  "scope": 549,
+  "excluded_missing_restricted116": 9,
+  "audit_outcome_counts": {
+    "no_counterexample_found": 526,
+    "uncertain": 12,
+    "confirmed_training_ambiguity": 11
+  },
+  "training_coverage_summary": {
+    "scope_tasks": 549,
+    "classification_counts": {
+      "bounded_support_only": 470,
+      "coverage_gap_no_test_divergence": 68,
+      "confirmed_insufficient": 11,
+      "not_assessed": 0
+    },
+    "availability_counts": {
+      "reviewed_record_available": 549,
+      "new_review_pending": 0
+    },
+    "tasks_with_structured_named_probe_evidence": 267,
+    "tasks_with_explicit_train_rejection_witnesses": 265,
+    "tasks_with_train_fitting_same_test_probes": 37,
+    "reviewed_but_coverage_not_assessed": [],
+    "coverage_evidence_level_counts": {
+      "reported_textual_contrasts": 193,
+      "only_textual_or_conditional_evidence_not_normalized": 89,
+      "explicit_structured_probes": 267
+    },
+    "fully_sufficient_or_unique_certifications": 0
+  },
+  "pinned_csv_commit": "910601e01466dd2f4498cf8c031423142241c52f",
+  "limits": [
+    "Finite alternative-rule searches; no global uniqueness certificate.",
+    "Most reviews are reference-assisted, not fully blind solving.",
+    "Difficulty is qualitative, not a measured human or clean-model success rate.",
+    "Pinned Git/PR fixtures were not byte-compared with the October 27 node1 run export.",
+    "Training coverage gaps that do not change supplied tests are separate from confirmed ambiguity."
+  ]
+}

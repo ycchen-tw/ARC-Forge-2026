@@ -1,0 +1,2 @@
+5757e97501b6a2b9db70e2969e05bf7e1a3f41508c4ac8dc7dd0632a146ef669  $ARC_RUNS/qwen38fn_eval/20261009-reap-mm/variants-v3/masks/ean_all.pt
+✓ /dev/shm/uid-$UID/models/Qwen3.8-FN-NVFP4-EAN320-v1 (106.2 GB, 20 shards)

@@ -1,0 +1,9 @@
+# c5: the same proxy parameters as c4 (reasoning trim 80k / keep 8 / min_gain 15k + carry tail 10k).
+--trim-reasoning-at
+80000
+--trim-keep-items
+8
+--trim-min-gain
+15000
+--carry-tail-tokens
+10000

@@ -1,0 +1,121 @@
+{
+ "schema_version": 1,
+ "run_root": "$ARC_RUNS/qwen38fn_rl/20261029-arc2r4-ctx64k90v2-qadR-tp1x3-b40k-c64k-alltests-g24b576-lr1e-4",
+ "seed": 20261009,
+ "rounds": 100,
+ "tokenizer_dir": "/dev/shm/uid-$UID/models/qwen38fn-qadmix-R-int3-gptq",
+ "poll_seconds": 5,
+ "min_free_gb": 30,
+ "disk_guard_paths": [
+  "$ARC_RUNS",
+  "$ARC_RAM_RUNS"
+ ],
+ "legacy_sync": false,
+ "pipeline": "stream",
+ "retention": {
+  "keep_merged": 2,
+  "drop_batch_payload": true
+ },
+ "stream": {
+  "group_size": 24,
+  "max_groups_in_flight": 32,
+  "max_pooled_groups": 128,
+  "batch_live_episodes": 576,
+  "max_staleness": 8,
+  "group_timeout_seconds": 18000,
+  "eval_keep_every": 5,
+  "hard_min_free_gb": 15,
+  "end_margin": 1.15,
+  "quarantine": {
+   "same_signature_max": 3,
+   "same_signature_seconds": 3600,
+   "max_fraction": 0.05,
+   "fraction_window_groups": 100,
+   "fraction_min_groups": 20
+  },
+  "group_ready": true,
+  "rollout_slots": 384,
+  "ramp_seconds": 1200.0
+ },
+ "rollout": {
+  "base_url": "http://127.0.0.1:30880/v1",
+  "served_name": "qwen38fn",
+  "idle_timeout_seconds": 180,
+  "ledger_drain_timeout_seconds": 300,
+  "sync_timeout_seconds": 1800,
+  "replica_urls": [
+   "http://127.0.0.1:30881/v1",
+   "http://127.0.0.1:30882/v1",
+   "http://127.0.0.1:30883/v1"
+  ],
+  "trainer_base_path": "/dev/shm/uid-$UID/models/qwen38fn-qadmix-R-int3-bf16dense"
+ },
+ "trainer": {
+  "endpoint_file": "$ARC_RUNS/qwen38fn_rl/20261029-arc2r4-ctx64k90v2-qadR-tp1x3-b40k-c64k-alltests-g24b576-lr1e-4/trainer/trainer_endpoint.json",
+  "train_timeout_seconds": 3600,
+  "publish_timeout_seconds": 1800,
+  "save_every_rounds": 1
+ },
+ "harness": {
+  "script": "work/arc_code/arc2/run_arc2.py",
+  "agent_python": "$ARC_RUNS/arc_code/agent-runtime-scipy/bin/python",
+  "driver_bin": "$ARC_CODEX_PREFIX",
+  "config": "$ARC_RUNS/qwen38fn_rl/20261029-arc2r4-ctx64k90v2-qadR-tp1x3-b40k-c64k-alltests-g24b576-lr1e-4/harness-train.json",
+  "launch_stagger_seconds": 2,
+  "terminate_grace_seconds": 600
+ },
+ "tasks": {
+  "train": {
+   "dir": "$ARC_DATA/arc2_pools/ctx64k90v2-20261029",
+   "ids_file": "$ARC_RUNS/qwen38fn_rl/20261029-arc2r4-ctx64k90v2-qadR-tp1x3-b40k-c64k-alltests-g24b576-lr1e-4/task_lists/train.txt",
+   "shuffle": true
+  },
+  "heldout": {
+   "dir": "$ARC_DATA/arc2_eval120fix/evaluation",
+   "ids_file": "$ARC_RUNS/qwen38fn_rl/20261029-arc2r4-ctx64k90v2-qadR-tp1x3-b40k-c64k-alltests-g24b576-lr1e-4/task_lists/heldout.txt"
+  }
+ },
+ "audit": {
+  "command": [
+   "$ARC_SGLANG_VENV/bin/python",
+   "-m",
+   "arcforge.tito"
+  ],
+  "whitelist": [],
+  "allow_budget_truncation": true,
+  "allow_splits": {
+   "text_differs": 64
+  },
+  "per_run": false,
+  "timeout_seconds": 3600
+ },
+ "prepare": {
+  "command": [
+   "env",
+   "MEDIA_DEVICE=cpu-exact",
+   "CUDA_VISIBLE_DEVICES=",
+   "ARC_SGLANG_FORK=$HOME/work/sglang-arc-2-topp",
+   "bash",
+   "work/qwen38fn_lora/prepare_rl.sh",
+   "--workers",
+   "4",
+   "--drop-stops",
+   "wall,deadline,cancelled,proxy_fatal"
+  ],
+  "timeout_seconds": 7200,
+  "temperature": 1.0,
+  "minibatches": 1,
+  "world": 3,
+  "bin_tokens": 200000,
+  "weight_version_recorded": true,
+  "max_gb": 25,
+  "reserve_gb": 3,
+  "adv_normalization": "none",
+  "loss_reduction": "prompt",
+  "top_p": 0.95,
+  "top_k": 20,
+  "algo": "mis",
+  "mis_low": 0.2,
+  "mis_high": 5.0
+ }
+}

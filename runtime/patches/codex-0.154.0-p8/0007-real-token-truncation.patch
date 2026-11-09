@@ -1,0 +1,974 @@
+Subject: [PATCH] arc: 0007-real-token-truncation (count tool-output budgets with
+ the served model's tokenizer)
+
+`tool_output_tokenizer = "/path/tokenizer.json"` makes every token budget of
+`codex-utils-output-truncation` real tokens of that HF tokenizer instead of
+`bytes / 4`. An unknown model slug falls back to a byte policy, so
+`tool_output_token_limit = 2500` used to mean 10,000 bytes, about 10k tokens of
+grid hex. With the key set the limit is a token policy, over-budget output keeps
+the first half and the last half of the budget (cut on char boundaries, both
+sides re-counted) and the marker reports the real number of tokens removed.
+
+- Covered: `truncate_text`, `formatted_truncate_text`, content items, function
+  output payloads (exec, shell, MCP, code mode, history recording), unified exec
+  `Original token count` and its response-size loop.
+- Fail fast: an unreadable/invalid file or a missing `tool_output_token_limit`
+  fails config loading. Loaded once per process; a second, different path errors.
+- Unset: no code path changes.
+---
+
+diff --git a/codex-rs/Cargo.lock b/codex-rs/Cargo.lock
+--- a/codex-rs/Cargo.lock
++++ b/codex-rs/Cargo.lock
+@@ -262,6 +262,7 @@
+  "cfg-if",
+  "getrandom 0.3.4",
+  "once_cell",
++ "serde",
+  "version_check",
+  "zerocopy",
+ ]
+@@ -1349,6 +1350,12 @@
+ version = "0.2.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
++
++[[package]]
++name = "base64"
++version = "0.13.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
+ 
+ [[package]]
+ name = "base64"
+@@ -4904,6 +4911,7 @@
+  "codex-protocol",
+  "codex-utils-string",
+  "pretty_assertions",
++ "tokenizers",
+ ]
+ 
+ [[package]]
+@@ -5236,6 +5244,7 @@
+  "itoa",
+  "rustversion",
+  "ryu",
++ "serde",
+  "static_assertions",
+ ]
+ 
+@@ -5788,6 +5797,12 @@
+ ]
+ 
+ [[package]]
++name = "daachorse"
++version = "3.0.3"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "5614204febbc33cc07a2806aa6440b904ac012b68eecc37f4493ea4a76455a3d"
++
++[[package]]
+ name = "darling"
+ version = "0.20.11"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -5923,6 +5938,15 @@
+  "darling_core 0.24.0",
+  "quote",
+  "syn 3.0.3",
++]
++
++[[package]]
++name = "dary_heap"
++version = "0.3.9"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "8b1e3a325bc115f096c8b77bbf027a7c2592230e70be2d985be950d3d5e60ebe"
++dependencies = [
++ "serde",
+ ]
+ 
+ [[package]]
+@@ -6105,6 +6129,37 @@
+ dependencies = [
+  "proc-macro2",
+  "quote",
++ "syn 2.0.117",
++]
++
++[[package]]
++name = "derive_builder"
++version = "0.20.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "507dfb09ea8b7fa618fcf76e953f4f5e192547945816d5358edffe39f6f94947"
++dependencies = [
++ "derive_builder_macro",
++]
++
++[[package]]
++name = "derive_builder_core"
++version = "0.20.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "2d5bcf7b024d6835cfb3d473887cd966994907effbe9227e8c8219824d06c4e8"
++dependencies = [
++ "darling 0.20.11",
++ "proc-macro2",
++ "quote",
++ "syn 2.0.117",
++]
++
++[[package]]
++name = "derive_builder_macro"
++version = "0.20.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "ab63b0e2bf4d5928aff72e83a7dace85d7bba5fe12dcc3c5a572d78caffd3f3c"
++dependencies = [
++ "derive_builder_core",
+  "syn 2.0.117",
+ ]
+ 
+@@ -6628,6 +6683,12 @@
+ version = "3.3.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "dea2df4cf52843e0452895c455a1a2cfbb842a1e7329671acf418fdc53ed4c59"
++
++[[package]]
++name = "esaxx-rs"
++version = "0.1.10"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "d817e038c30374a4bcb22f94d0a8a0e216958d4c3dcde369b1439fec4bdda6e6"
+ 
+ [[package]]
+ name = "etcetera"
+@@ -9949,6 +10010,22 @@
+ checksum = "dae608c151f68243f2b000364e1f7b186d9c29845f7d2d85bd31b9ad77ad552b"
+ 
+ [[package]]
++name = "macro_rules_attribute"
++version = "0.2.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "65049d7923698040cd0b1ddcced9b0eb14dd22c5f86ae59c3740eab64a676520"
++dependencies = [
++ "macro_rules_attribute-proc_macro",
++ "paste",
++]
++
++[[package]]
++name = "macro_rules_attribute-proc_macro"
++version = "0.2.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "670fdfda89751bc4a84ac13eaa63e205cf0fd22b4c9a5fbfa085b63c1f1d3a30"
++
++[[package]]
+ name = "maplit"
+ version = "1.0.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -10114,6 +10191,28 @@
+  "smallvec",
+  "tagptr",
+  "uuid",
++]
++
++[[package]]
++name = "monostate"
++version = "0.1.18"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "3341a273f6c9d5bef1908f17b7267bbab0e95c9bf69a0d4dcf8e9e1b2c76ef67"
++dependencies = [
++ "monostate-impl",
++ "serde",
++ "serde_core",
++]
++
++[[package]]
++name = "monostate-impl"
++version = "0.1.18"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "e4db6d5580af57bf992f59068d4ea26fd518574ff48d7639b255a36f9de6e7e9"
++dependencies = [
++ "proc-macro2",
++ "quote",
++ "syn 2.0.117",
+ ]
+ 
+ [[package]]
+@@ -12556,6 +12655,17 @@
+ dependencies = [
+  "either",
+  "rayon-core",
++]
++
++[[package]]
++name = "rayon-cond"
++version = "0.4.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "2964d0cf57a3e7a06e8183d14a8b527195c706b7983549cd5462d5aa3747438f"
++dependencies = [
++ "either",
++ "itertools 0.14.0",
++ "rayon",
+ ]
+ 
+ [[package]]
+@@ -14339,6 +14449,18 @@
+ dependencies = [
+  "base64ct",
+  "der",
++]
++
++[[package]]
++name = "spm_precompiled"
++version = "0.1.4"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "5851699c4033c63636f7ea4cf7b7c1f1bf06d0cc03cfb42e711de5a5c46cf326"
++dependencies = [
++ "base64 0.13.1",
++ "nom 7.1.3",
++ "serde",
++ "unicode-segmentation",
+ ]
+ 
+ [[package]]
+@@ -15478,6 +15600,39 @@
+ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
+ 
+ [[package]]
++name = "tokenizers"
++version = "0.23.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "7afbf6e88718afcc138bad01d6ccc3051dbbc3b2ce9793d8b8a3aeb610969cfc"
++dependencies = [
++ "ahash",
++ "compact_str",
++ "daachorse",
++ "dary_heap",
++ "derive_builder",
++ "esaxx-rs",
++ "getrandom 0.3.4",
++ "itertools 0.14.0",
++ "log",
++ "macro_rules_attribute",
++ "monostate",
++ "onig",
++ "paste",
++ "rand 0.9.3",
++ "rayon",
++ "rayon-cond",
++ "regex",
++ "regex-syntax",
++ "serde",
++ "serde_json",
++ "spm_precompiled",
++ "thiserror 2.0.18",
++ "unicode-normalization-alignments",
++ "unicode-segmentation",
++ "unicode_categories",
++]
++
++[[package]]
+ name = "tokio"
+ version = "1.52.3"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -16197,6 +16352,15 @@
+ ]
+ 
+ [[package]]
++name = "unicode-normalization-alignments"
++version = "0.1.12"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "43f613e4fa046e69818dd287fdc4bc78175ff20331479dab6e1b0f98d57062de"
++dependencies = [
++ "smallvec",
++]
++
++[[package]]
+ name = "unicode-properties"
+ version = "0.1.4"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -16236,6 +16400,12 @@
+ version = "0.2.6"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
++
++[[package]]
++name = "unicode_categories"
++version = "0.1.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "39ec24b3121d976906ece63c9daad25b85969647682eee313cb5779fdd69e14e"
+ 
+ [[package]]
+ name = "universal-hash"
+diff --git a/codex-rs/Cargo.toml b/codex-rs/Cargo.toml
+--- a/codex-rs/Cargo.toml
++++ b/codex-rs/Cargo.toml
+@@ -479,6 +479,9 @@
+ tikv-jemallocator = "=0.7.0"
+ time = "0.3.47"
+ tiny_http = "0.12"
++# Patch 0007. `onig` is the regex engine the Python package uses (and syntect already links it
++# into this binary); the defaults would add a C++ suffix-array builder and a progress bar.
++tokenizers = { version = "=0.23.2", default-features = false, features = ["onig"] }
+ tokio = "1"
+ tokio-rustls = "0.26.4"
+ tokio-stream = "0.1.18"
+diff --git a/codex-rs/config/src/config_toml.rs b/codex-rs/config/src/config_toml.rs
+--- a/codex-rs/config/src/config_toml.rs
++++ b/codex-rs/config/src/config_toml.rs
+@@ -325,6 +325,11 @@
+     /// Token budget applied when storing tool/function outputs in the context manager.
+     pub tool_output_token_limit: Option<usize>,
+ 
++    /// HF `tokenizer.json` of the served model (patch 0007). When set, tool-output token
++    /// budgets count real tokens instead of `bytes / 4`, and `tool_output_token_limit` is
++    /// required. A file that cannot be loaded fails config loading.
++    pub tool_output_tokenizer: Option<AbsolutePathBuf>,
++
+     /// Maximum poll window for background terminal output (`write_stdin`), in milliseconds.
+     /// Default: `300000` (5 minutes).
+     pub background_terminal_max_timeout: Option<u64>,
+diff --git a/codex-rs/core/src/config/mod.rs b/codex-rs/core/src/config/mod.rs
+--- a/codex-rs/core/src/config/mod.rs
++++ b/codex-rs/core/src/config/mod.rs
+@@ -3911,6 +3911,17 @@
+         // Load base instructions override from a file if specified. If the
+         // path is relative, resolve it against the effective cwd so the
+         // behaviour matches other path-like config values.
++        if let Some(path) = cfg.tool_output_tokenizer.as_ref() {
++            if cfg.tool_output_token_limit.is_none() {
++                return Err(std::io::Error::new(
++                    std::io::ErrorKind::InvalidInput,
++                    "tool_output_tokenizer requires tool_output_token_limit",
++                ));
++            }
++            codex_utils_output_truncation::install_tool_output_tokenizer(path.as_path())
++                .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
++        }
++
+         let model_instructions_path = cfg.model_instructions_file.as_ref();
+         let file_base_instructions = Self::try_read_non_empty_file(
+             fs,
+diff --git a/codex-rs/core/src/tools/context.rs b/codex-rs/core/src/tools/context.rs
+--- a/codex-rs/core/src/tools/context.rs
++++ b/codex-rs/core/src/tools/context.rs
+@@ -17,8 +17,10 @@
+ use codex_tools::ToolName;
+ use codex_utils_audio::estimate_audio_token_count;
+ use codex_utils_output_truncation::TruncationPolicy;
+-use codex_utils_output_truncation::approx_token_count;
++use codex_utils_output_truncation::fits_policy;
+ use codex_utils_output_truncation::formatted_truncate_text;
++use codex_utils_output_truncation::token_count;
++use codex_utils_output_truncation::tool_output_tokenizer_installed;
+ use codex_utils_output_truncation::truncate_function_output_payload;
+ use codex_utils_output_truncation::truncate_text;
+ use serde::Serialize;
+@@ -465,7 +467,7 @@
+         };
+ 
+         let marker = format_output_omission_marker(omitted_bytes.get());
+-        if text.len() <= policy.byte_budget() {
++        if fits_policy(&text, policy) {
+             return if text.contains(&marker) {
+                 text
+             } else {
+@@ -475,7 +477,7 @@
+ 
+         let original_token_count = self
+             .original_token_count
+-            .unwrap_or_else(|| approx_token_count(&text));
++            .unwrap_or_else(|| token_count(&text));
+         let truncated = truncate_text(&text, policy);
+         let omission_notice = if truncated.contains(&marker) {
+             String::new()
+@@ -520,6 +522,21 @@
+             .saturating_sub(header.len().saturating_add(/*rhs*/ 1));
+         let mut policy = self.model_output_policy();
+         let mut output = self.truncated_output_with_policy(policy);
++
++        // Patch 0007: history counts real tokens, so measure the complete response in them.
++        if tool_output_tokenizer_installed() {
++            let budget = (self.truncation_policy * 1.2).token_budget();
++            loop {
++                let response = format!("{header}\n{output}");
++                let tokens = token_count(&response);
++                if tokens <= budget || policy.token_budget() == 0 {
++                    return response;
++                }
++                policy =
++                    TruncationPolicy::Tokens(policy.token_budget().saturating_sub(tokens - budget));
++                output = self.truncated_output_with_policy(policy);
++            }
++        }
+ 
+         // History applies this same serialization budget to the complete response.
+         // Reserve room for metadata, warning headers, and the truncation marker so
+diff --git a/codex-rs/core/src/tools/handlers/unified_exec/exec_command.rs b/codex-rs/core/src/tools/handlers/unified_exec/exec_command.rs
+--- a/codex-rs/core/src/tools/handlers/unified_exec/exec_command.rs
++++ b/codex-rs/core/src/tools/handlers/unified_exec/exec_command.rs
+@@ -41,7 +41,7 @@
+ use codex_tools::JsonSchema;
+ use codex_tools::ToolName;
+ use codex_tools::ToolSpec;
+-use codex_utils_output_truncation::approx_token_count;
++use codex_utils_output_truncation::token_count;
+ use codex_utils_path_uri::PathConvention;
+ use codex_utils_string::truncate_middle_chars;
+ 
+@@ -455,7 +455,7 @@
+             }) => {
+                 let output_text = output.aggregated_output.text;
+                 let original_token_count =
+-                    original_token_count.unwrap_or_else(|| approx_token_count(&output_text));
++                    original_token_count.unwrap_or_else(|| token_count(&output_text));
+                 Ok(boxed_tool_output(ExecCommandToolOutput {
+                     event_call_id: context.call_id.clone(),
+                     chunk_id: generate_chunk_id(),
+diff --git a/codex-rs/core/src/unified_exec/head_tail_buffer.rs b/codex-rs/core/src/unified_exec/head_tail_buffer.rs
+--- a/codex-rs/core/src/unified_exec/head_tail_buffer.rs
++++ b/codex-rs/core/src/unified_exec/head_tail_buffer.rs
+@@ -1,5 +1,8 @@
+ use crate::unified_exec::UNIFIED_EXEC_OUTPUT_MAX_BYTES;
+ use crate::unified_exec::format_output_omission_marker;
++use codex_utils_output_truncation::approx_tokens_from_byte_count;
++use codex_utils_output_truncation::token_count;
++use codex_utils_output_truncation::tool_output_tokenizer_installed;
+ use std::collections::VecDeque;
+ 
+ /// A capped buffer that preserves a stable prefix ("head") and suffix ("tail"),
+@@ -35,6 +38,18 @@
+     /// Total bytes observed by the buffer, including bytes omitted by the cap.
+     pub(crate) fn total_bytes(&self) -> usize {
+         self.retained_bytes().saturating_add(self.omitted_bytes)
++    }
++
++    /// Tokens in everything observed: the byte estimate, or with patch 0007's tokenizer the real
++    /// count of what was retained plus the byte estimate for what the cap dropped.
++    pub(crate) fn original_token_count(&self) -> usize {
++        let approx =
++            |bytes| usize::try_from(approx_tokens_from_byte_count(bytes)).unwrap_or(usize::MAX);
++        if !tool_output_tokenizer_installed() {
++            return approx(self.total_bytes());
++        }
++        token_count(&String::from_utf8_lossy(&self.to_bytes()))
++            .saturating_add(approx(self.omitted_bytes))
+     }
+ 
+     /// Append a chunk of bytes to the buffer.
+diff --git a/codex-rs/core/src/unified_exec/process_manager.rs b/codex-rs/core/src/unified_exec/process_manager.rs
+--- a/codex-rs/core/src/unified_exec/process_manager.rs
++++ b/codex-rs/core/src/unified_exec/process_manager.rs
+@@ -84,7 +84,6 @@
+ use codex_sandboxing::SandboxCommand;
+ use codex_shell_command::is_dangerous_command::DangerousCommandPlatform;
+ use codex_tools::ToolName;
+-use codex_utils_output_truncation::approx_tokens_from_byte_count;
+ use codex_utils_path_uri::PathUri;
+ 
+ const UNIFIED_EXEC_ENV: [(&str, &str); 10] = [
+@@ -628,10 +627,7 @@
+         }
+         let wall_time = Instant::now().saturating_duration_since(start);
+ 
+-        let original_token_count = usize::try_from(approx_tokens_from_byte_count(
+-            collected_output.total_bytes(),
+-        ))
+-        .unwrap_or(usize::MAX);
++        let original_token_count = collected_output.original_token_count();
+         let output_omitted_bytes = NonZeroUsize::new(collected_output.omitted_bytes());
+         let collected = collected_output.to_bytes_with_omission_marker();
+         let text = String::from_utf8_lossy(&collected).to_string();
+@@ -964,10 +960,7 @@
+             Self::collect_output_until_deadline(&output, pause_state, deadline).await;
+         let wall_time = Instant::now().saturating_duration_since(start);
+ 
+-        let original_token_count = usize::try_from(approx_tokens_from_byte_count(
+-            collected_output.total_bytes(),
+-        ))
+-        .unwrap_or(usize::MAX);
++        let original_token_count = collected_output.original_token_count();
+         let output_omitted_bytes = NonZeroUsize::new(collected_output.omitted_bytes());
+         let collected = collected_output.to_bytes_with_omission_marker();
+         let chunk_id = generate_chunk_id();
+diff --git a/codex-rs/models-manager/src/model_info.rs b/codex-rs/models-manager/src/model_info.rs
+--- a/codex-rs/models-manager/src/model_info.rs
++++ b/codex-rs/models-manager/src/model_info.rs
+@@ -12,6 +12,7 @@
+ 
+ use crate::config::ModelsManagerConfig;
+ use codex_utils_output_truncation::approx_bytes_for_tokens;
++use codex_utils_output_truncation::tool_output_tokenizer_installed;
+ use tracing::warn;
+ 
+ pub const BASE_INSTRUCTIONS: &str = include_str!("../prompt.md");
+@@ -40,12 +41,13 @@
+     }
+     if let Some(token_limit) = config.tool_output_token_limit {
+         model.truncation_policy = match model.truncation_policy.mode {
+-            TruncationMode::Bytes => {
++            // Patch 0007: a real tokenizer makes the limit real tokens, whatever the model's mode.
++            TruncationMode::Bytes if !tool_output_tokenizer_installed() => {
+                 let byte_limit =
+                     i64::try_from(approx_bytes_for_tokens(token_limit)).unwrap_or(i64::MAX);
+                 TruncationPolicyConfig::bytes(byte_limit)
+             }
+-            TruncationMode::Tokens => {
++            TruncationMode::Bytes | TruncationMode::Tokens => {
+                 let limit = i64::try_from(token_limit).unwrap_or(i64::MAX);
+                 TruncationPolicyConfig::tokens(limit)
+             }
+diff --git a/codex-rs/utils/output-truncation/Cargo.toml b/codex-rs/utils/output-truncation/Cargo.toml
+--- a/codex-rs/utils/output-truncation/Cargo.toml
++++ b/codex-rs/utils/output-truncation/Cargo.toml
+@@ -10,6 +10,7 @@
+ [dependencies]
+ codex-protocol = { workspace = true }
+ codex-utils-string = { workspace = true }
++tokenizers = { workspace = true }
+ 
+ [dev-dependencies]
+ pretty_assertions = { workspace = true }
+diff --git a/codex-rs/utils/output-truncation/src/lib.rs b/codex-rs/utils/output-truncation/src/lib.rs
+--- a/codex-rs/utils/output-truncation/src/lib.rs
++++ b/codex-rs/utils/output-truncation/src/lib.rs
+@@ -11,12 +11,36 @@
+ 
+ pub use codex_protocol::protocol::TruncationPolicy;
+ 
++mod real_tokens;
++pub use real_tokens::install_tool_output_tokenizer;
++use real_tokens::real_tokenizer;
++pub use real_tokens::tool_output_token_count;
++pub use real_tokens::tool_output_tokenizer_installed;
++use real_tokens::truncate_middle_real_tokens;
++
++/// `content` fits `policy` without truncation. Real tokens once `tool_output_tokenizer` is
++/// installed (patch 0007) and the policy counts tokens; otherwise the original byte estimate.
++pub fn fits_policy(content: &str, policy: TruncationPolicy) -> bool {
++    match real_tokenizer(policy) {
++        Some(tokenizer) => real_tokens::count(tokenizer, content) <= policy.token_budget(),
++        None => content.len() <= policy.byte_budget(),
++    }
++}
++
++/// [`approx_token_count`], or the real count once `tool_output_tokenizer` is installed.
++pub fn token_count(content: &str) -> usize {
++    tool_output_token_count(content).unwrap_or_else(|| approx_token_count(content))
++}
++
+ pub fn formatted_truncate_text(content: &str, policy: TruncationPolicy) -> String {
+-    if content.len() <= policy.byte_budget() {
++    if fits_policy(content, policy) {
+         return content.to_string();
+     }
+ 
+-    let original_token_count = approx_token_count(content);
++    let original_token_count = match real_tokenizer(policy) {
++        Some(tokenizer) => real_tokens::count(tokenizer, content),
++        None => approx_token_count(content),
++    };
+     let total_lines = content.lines().count();
+     let result = truncate_text(content, policy);
+     format!(
+@@ -27,7 +51,10 @@
+ pub fn truncate_text(content: &str, policy: TruncationPolicy) -> String {
+     match policy {
+         TruncationPolicy::Bytes(bytes) => truncate_middle_chars(content, bytes),
+-        TruncationPolicy::Tokens(tokens) => truncate_middle_with_token_budget(content, tokens).0,
++        TruncationPolicy::Tokens(tokens) => match real_tokenizer(policy) {
++            Some(tokenizer) => truncate_middle_real_tokens(content, tokens, tokenizer),
++            None => truncate_middle_with_token_budget(content, tokens).0,
++        },
+     }
+ }
+ 
+@@ -76,11 +103,14 @@
+         combined.push_str(text);
+     }
+ 
+-    if combined.len() <= policy.byte_budget() {
++    if fits_policy(&combined, policy) {
+         return (items.to_vec(), None);
+     }
+ 
+-    let original_token_count = approx_token_count(&combined);
++    let original_token_count = match real_tokenizer(policy) {
++        Some(tokenizer) => real_tokens::count(tokenizer, &combined),
++        None => approx_token_count(&combined),
++    };
+     let mut out = vec![FunctionCallOutputContentItem::InputText {
+         text: formatted_truncate_text(&combined, policy),
+     }];
+@@ -139,7 +169,7 @@
+ 
+                 let cost = match policy {
+                     TruncationPolicy::Bytes(_) => text.len(),
+-                    TruncationPolicy::Tokens(_) => approx_token_count(text),
++                    TruncationPolicy::Tokens(_) => token_count(text),
+                 };
+ 
+                 if cost <= remaining_budget {
+diff --git a/codex-rs/utils/output-truncation/src/real_tokens.rs b/codex-rs/utils/output-truncation/src/real_tokens.rs
+new file mode 100644
+--- /dev/null
++++ b/codex-rs/utils/output-truncation/src/real_tokens.rs
+@@ -0,0 +1,137 @@
++//! Patch 0007: count tool-output token budgets with the served model's own tokenizer.
++//!
++//! Without it a `Tokens(n)` budget is `n * 4` bytes, and an unknown model slug gets a byte
++//! policy anyway (`tool_output_token_limit` turns into `limit * 4` bytes). Grid dumps run at
++//! about one token per byte, so "2,500 tokens" let ~10,000 real tokens through. With
++//! `tool_output_tokenizer = "/path/tokenizer.json"` every `Tokens` budget in this crate is real
++//! tokens: keep the first half and the last half of the budget, cut the middle on a char
++//! boundary, and report the real number of tokens removed.
++
++use std::path::Path;
++use std::path::PathBuf;
++use std::sync::OnceLock;
++
++use codex_protocol::protocol::TruncationPolicy;
++use tokenizers::Tokenizer;
++
++static TOKENIZER: OnceLock<(PathBuf, Tokenizer)> = OnceLock::new();
++
++/// Load the tokenizer once per process. Loading the same path again is a no-op; a different
++/// path is an error, since budgets already applied would silently change meaning.
++pub fn install_tool_output_tokenizer(path: &Path) -> Result<(), String> {
++    if TOKENIZER.get().is_none() {
++        let mut tokenizer = Tokenizer::from_file(path).map_err(|err| {
++            format!(
++                "failed to load tool_output_tokenizer {}: {err}",
++                path.display()
++            )
++        })?;
++        // A tokenizer.json may carry padding/truncation for batching; neither belongs in a count.
++        tokenizer.with_padding(None);
++        tokenizer
++            .with_truncation(None)
++            .map_err(|err| format!("tool_output_tokenizer {}: {err}", path.display()))?;
++        // Losing a race to another thread is fine as long as it installed the same file.
++        let _ = TOKENIZER.set((path.to_path_buf(), tokenizer));
++    }
++    let (installed, _) = TOKENIZER
++        .get()
++        .expect("tool_output_tokenizer was just installed");
++    if installed != path {
++        return Err(format!(
++            "tool_output_tokenizer is already {}, refusing {}",
++            installed.display(),
++            path.display()
++        ));
++    }
++    Ok(())
++}
++
++pub fn tool_output_tokenizer_installed() -> bool {
++    TOKENIZER.get().is_some()
++}
++
++/// The real token count of `text`, or `None` when no tokenizer is installed.
++pub fn tool_output_token_count(text: &str) -> Option<usize> {
++    TOKENIZER.get().map(|(_, tokenizer)| count(tokenizer, text))
++}
++
++pub(crate) fn real_tokenizer(policy: TruncationPolicy) -> Option<&'static Tokenizer> {
++    match policy {
++        TruncationPolicy::Tokens(_) => TOKENIZER.get().map(|(_, tokenizer)| tokenizer),
++        TruncationPolicy::Bytes(_) => None,
++    }
++}
++
++pub(crate) fn count(tokenizer: &Tokenizer, text: &str) -> usize {
++    tokenizer
++        .encode_fast(text, /*add_special_tokens*/ false)
++        .unwrap_or_else(|err| panic!("tool_output_tokenizer failed to encode: {err}"))
++        .len()
++}
++
++/// Keep at most `max_tokens / 2` tokens from the start and the rest of the budget from the end,
++/// both re-counted on the kept text, with the original marker format.
++pub(crate) fn truncate_middle_real_tokens(
++    s: &str,
++    max_tokens: usize,
++    tokenizer: &Tokenizer,
++) -> String {
++    let offsets = tokenizer
++        .encode(s, /*add_special_tokens*/ false)
++        .unwrap_or_else(|err| panic!("tool_output_tokenizer failed to encode: {err}"))
++        .get_offsets()
++        .to_vec();
++    let total = offsets.len();
++    if total <= max_tokens {
++        return s.to_string();
++    }
++    let left = max_tokens / 2;
++    let right = max_tokens - left;
++
++    // A token can be half of a multi-byte char, so a cut at its offset is snapped to a char
++    // boundary and the kept side re-counted; step one token inward until it fits.
++    let mut keep = left;
++    let prefix_end = loop {
++        if keep == 0 {
++            break 0;
++        }
++        let end = floor_char_boundary(s, offsets[keep].0);
++        if count(tokenizer, &s[..end]) <= left {
++            break end;
++        }
++        keep -= 1;
++    };
++    let mut keep = right;
++    let suffix_start = loop {
++        if keep == 0 {
++            break s.len();
++        }
++        let start = ceil_char_boundary(s, offsets[total - keep].0).max(prefix_end);
++        if count(tokenizer, &s[start..]) <= right {
++            break start;
++        }
++        keep -= 1;
++    };
++
++    let prefix = &s[..prefix_end];
++    let suffix = &s[suffix_start..];
++    let removed = total.saturating_sub(count(tokenizer, prefix) + count(tokenizer, suffix));
++    format!("{prefix}…{removed} tokens truncated…{suffix}")
++}
++
++fn floor_char_boundary(s: &str, mut index: usize) -> usize {
++    index = index.min(s.len());
++    while !s.is_char_boundary(index) {
++        index -= 1;
++    }
++    index
++}
++
++fn ceil_char_boundary(s: &str, mut index: usize) -> usize {
++    index = index.min(s.len());
++    while !s.is_char_boundary(index) {
++        index += 1;
++    }
++    index
++}
+diff --git a/codex-rs/utils/output-truncation/tests/real_tokens.rs b/codex-rs/utils/output-truncation/tests/real_tokens.rs
+new file mode 100644
+--- /dev/null
++++ b/codex-rs/utils/output-truncation/tests/real_tokens.rs
+@@ -0,0 +1,197 @@
++//! Patch 0007 with a tokenizer installed. A separate test binary, because the tokenizer is
++//! process-global: the unit tests in `src/` run without one and pin the original behavior.
++
++use std::path::PathBuf;
++use std::sync::Once;
++
++use codex_protocol::models::FunctionCallOutputContentItem;
++use codex_utils_output_truncation::TruncationPolicy;
++use codex_utils_output_truncation::fits_policy;
++use codex_utils_output_truncation::formatted_truncate_text;
++use codex_utils_output_truncation::install_tool_output_tokenizer;
++use codex_utils_output_truncation::tool_output_token_count;
++use codex_utils_output_truncation::truncate_function_output_items_with_policy;
++use codex_utils_output_truncation::truncate_text;
++use tokenizers::Tokenizer;
++use tokenizers::models::bpe::BPE;
++use tokenizers::pre_tokenizers::byte_level::ByteLevel;
++
++/// Byte-level BPE with a handful of merges: ASCII words get multi-byte tokens, while CJK and
++/// emoji stay one token per byte, so cuts regularly land inside a char.
++fn install() {
++    static WRITE: Once = Once::new();
++    let path =
++        std::env::temp_dir().join(format!("codex-0007-tokenizer-{}.json", std::process::id()));
++    WRITE.call_once(|| {
++        let merges = [
++            ("Ġ", "t"),
++            ("h", "e"),
++            ("Ġt", "he"),
++            ("0", "0"),
++            ("1", "2"),
++            ("a", "b"),
++        ];
++        let mut alphabet: Vec<String> = ByteLevel::alphabet()
++            .into_iter()
++            .map(|ch| ch.to_string())
++            .collect();
++        alphabet.sort_unstable();
++        alphabet.extend(merges.iter().map(|(a, b)| format!("{a}{b}")));
++        let vocab: Vec<String> = alphabet
++            .iter()
++            .enumerate()
++            .map(|(id, token)| format!("{:?}:{id}", token))
++            .collect();
++        let vocab_path = path.with_extension("vocab.json");
++        let merges_path = path.with_extension("merges.txt");
++        std::fs::write(&vocab_path, format!("{{{}}}", vocab.join(","))).expect("write vocab");
++        let merges: Vec<String> = merges.iter().map(|(a, b)| format!("{a} {b}")).collect();
++        std::fs::write(&merges_path, merges.join("\n")).expect("write merges");
++        let bpe = BPE::from_file(vocab_path.to_str().unwrap(), merges_path.to_str().unwrap())
++            .build()
++            .expect("bpe");
++        let mut tokenizer = Tokenizer::new(bpe);
++        tokenizer.with_pre_tokenizer(Some(ByteLevel::default().add_prefix_space(false)));
++        tokenizer
++            .save(&path, /*pretty*/ false)
++            .expect("save tokenizer");
++    });
++    install_tool_output_tokenizer(&path).expect("install");
++}
++
++fn count(text: &str) -> usize {
++    tool_output_token_count(text).expect("installed")
++}
++
++fn mixed_text() -> String {
++    let grid: String = (0..64)
++        .map(|row| {
++            (0..64)
++                .map(|col| format!("{:x}", (row * 7 + col) % 16))
++                .collect::<String>()
++                + "\n"
++        })
++        .collect();
++    format!("the start 中文字串 🎉🎉 {grid} the middle ab12 00 終わり 👩‍👩‍👧 the end")
++}
++
++/// `(prefix, removed, suffix)` of a truncated output.
++fn split_marker(out: &str) -> (&str, usize, &str) {
++    let start = out.find('…').expect("marker start");
++    let rest = &out[start + '…'.len_utf8()..];
++    let end = rest.find(" tokens truncated…").expect("marker end");
++    let removed = rest[..end].parse().expect("removed count");
++    (
++        &out[..start],
++        removed,
++        &rest[end + " tokens truncated…".len()..],
++    )
++}
++
++#[test]
++fn keeps_half_budget_each_side_and_reports_real_removed_count() {
++    install();
++    let text = mixed_text();
++    let total = count(&text);
++    for limit in [1, 2, 3, 7, 10, 101, 1000, total - 1] {
++        let out = truncate_text(&text, TruncationPolicy::Tokens(limit));
++        let (prefix, removed, suffix) = split_marker(&out);
++        let (left, right) = (count(prefix), count(suffix));
++        assert!(left <= limit / 2, "limit {limit}: prefix has {left} tokens");
++        assert!(
++            right <= limit - limit / 2,
++            "limit {limit}: suffix has {right} tokens"
++        );
++        assert!(left + right <= limit);
++        // Only snapping a split char may cost a token or two per side.
++        assert!(
++            left + 4 >= limit / 2 && right + 4 >= limit - limit / 2,
++            "limit {limit}: {left}+{right}"
++        );
++        assert!(text.starts_with(prefix) && text.ends_with(suffix));
++        assert_eq!(removed, total - left - right);
++    }
++}
++
++#[test]
++fn cuts_inside_multibyte_chars_without_panicking() {
++    install();
++    // No merges apply: every byte of every char is its own token.
++    let text = "中文🎉👩‍👩‍👧".repeat(50);
++    let total = count(&text);
++    assert_eq!(total, text.len());
++    for limit in 0..40 {
++        let out = truncate_text(&text, TruncationPolicy::Tokens(limit));
++        let (prefix, removed, suffix) = split_marker(&out);
++        assert!(count(prefix) <= limit / 2 && count(suffix) <= limit - limit / 2);
++        assert_eq!(removed, total - count(prefix) - count(suffix));
++    }
++}
++
++#[test]
++fn under_budget_is_untouched_and_bytes_policy_is_unchanged() {
++    install();
++    let text = mixed_text();
++    let total = count(&text);
++    assert_eq!(truncate_text(&text, TruncationPolicy::Tokens(total)), text);
++    assert_eq!(
++        formatted_truncate_text(&text, TruncationPolicy::Tokens(total)),
++        text
++    );
++    assert_eq!(truncate_text("", TruncationPolicy::Tokens(0)), "");
++    assert!(fits_policy(&text, TruncationPolicy::Tokens(total)));
++    assert!(!fits_policy(&text, TruncationPolicy::Tokens(total - 1)));
++    // The grid is about one token per byte: the old `bytes / 4` estimate would have passed it.
++    assert!(text.len() <= TruncationPolicy::Tokens(total / 2).byte_budget());
++    assert!(!fits_policy(&text, TruncationPolicy::Tokens(total / 2)));
++    // A byte budget never consults the tokenizer.
++    assert!(fits_policy(&text, TruncationPolicy::Bytes(text.len())));
++}
++
++#[test]
++fn formatted_output_reports_the_real_original_count() {
++    install();
++    let text = mixed_text();
++    let out = formatted_truncate_text(&text, TruncationPolicy::Tokens(100));
++    let header = format!(
++        "Warning: truncated output (original token count: {})\nTotal output lines: {}\n\n",
++        count(&text),
++        text.lines().count()
++    );
++    assert!(out.starts_with(&header), "{out}");
++    let (prefix, _, suffix) = split_marker(&out[header.len()..]);
++    assert!(count(prefix) + count(suffix) <= 100);
++}
++
++#[test]
++fn content_items_are_charged_real_tokens() {
++    install();
++    let text = mixed_text();
++    let items = vec![
++        FunctionCallOutputContentItem::InputText {
++            text: "the the".to_string(),
++        },
++        FunctionCallOutputContentItem::InputText { text: text.clone() },
++    ];
++    let out =
++        truncate_function_output_items_with_policy(&items, TruncationPolicy::Tokens(50), |_| 0);
++    let [
++        FunctionCallOutputContentItem::InputText { text: first },
++        FunctionCallOutputContentItem::InputText { text: second },
++    ] = out.as_slice()
++    else {
++        panic!("{out:?}");
++    };
++    assert_eq!(first, "the the");
++    let (prefix, _, suffix) = split_marker(second);
++    assert!(count(prefix) + count(suffix) <= 50 - count("the the"));
++}
++
++#[test]
++fn install_is_once_per_process() {
++    install();
++    install();
++    let err = install_tool_output_tokenizer(&PathBuf::from("/nonexistent/tokenizer.json"))
++        .expect_err("a second, different tokenizer must be refused");
++    assert!(err.contains("already"), "{err}");
++}
+diff --git a/codex-rs/utils/output-truncation/tests/real_tokens_bad_file.rs b/codex-rs/utils/output-truncation/tests/real_tokens_bad_file.rs
+new file mode 100644
+--- /dev/null
++++ b/codex-rs/utils/output-truncation/tests/real_tokens_bad_file.rs
+@@ -0,0 +1,19 @@
++//! Patch 0007: a tokenizer that cannot be loaded is an error, never a silent byte estimate.
++
++use std::path::Path;
++
++use codex_utils_output_truncation::install_tool_output_tokenizer;
++use codex_utils_output_truncation::tool_output_tokenizer_installed;
++
++#[test]
++fn unreadable_or_invalid_tokenizer_is_an_error() {
++    let missing = install_tool_output_tokenizer(Path::new("/nonexistent/tokenizer.json"))
++        .expect_err("missing file");
++    assert!(missing.contains("/nonexistent/tokenizer.json"), "{missing}");
++
++    let garbage =
++        std::env::temp_dir().join(format!("codex-0007-garbage-{}.json", std::process::id()));
++    std::fs::write(&garbage, "{\"not\": \"a tokenizer\"}").expect("write");
++    install_tool_output_tokenizer(&garbage).expect_err("invalid tokenizer.json");
++    assert!(!tool_output_tokenizer_installed());
++}

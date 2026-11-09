@@ -1,0 +1,65 @@
+{
+  "upstream": "arcprize/ARC-AGI-2 f3283f727488ad98fe575ea6a5ac981e4a188e49 data/evaluation",
+  "note": "cells are [row, col, upstream value, fixed value], 0-indexed. Every task listed here must hash to upstream_sha256 before the edit, and every upstream value must match, or build.py stops.",
+  "fixes": [
+    {
+      "task": "581f7754", "upstream_sha256": "9c595ea5c3b1d4793381ae6c69c50c179d0eb90336ad59fe3c39b2fae18cdc55",
+      "kind": "train_error",
+      "why": "train 1: the 3-box at rows 3-5 is moved one column further left than the rule (shift along the anchor axis only) puts it; every other object and pair follows the rule. Same edit as upstream PR #52 (issue #51).",
+      "edits": [
+        {"split": "train", "pair": 1, "grid": "output",
+         "cells": [[3, 8, 3, 8], [3, 11, 8, 3], [4, 8, 3, 8], [4, 9, 1, 3], [4, 10, 3, 1], [4, 11, 8, 3], [5, 8, 3, 8], [5, 11, 8, 3]]}
+      ]
+    },
+    {
+      "task": "e12f9a14", "upstream_sha256": "f727460b73e60cc64c7648bd3033ecfdd538e023a9cd7557d3aa8c2bd7d488f7",
+      "kind": "train_error",
+      "why": "train 2: the corner gap (13,14) of the 4-core emits no diagonal beam; every other corner gap in the task (train 0, 1, 3 and the tests) does. The fix draws the beam (13,14)..(18,19), which is what the seed_bank reconstruction gives. Not reported upstream.",
+      "edits": [
+        {"split": "train", "pair": 2, "grid": "output",
+         "cells": [[13, 14, 8, 4], [14, 15, 8, 4], [15, 16, 8, 4], [16, 17, 8, 4], [17, 18, 8, 4], [18, 19, 8, 4]]}
+      ]
+    },
+    {
+      "task": "b6f77b65", "upstream_sha256": "f597ff3fa1fa6c7c063364a47f12f689fdded5229cf945f4aecfc5ce0d700cc8",
+      "kind": "train_error",
+      "why": "train 1: the output has one red cell (4,5) more than the input (7 -> 8); in the other six pairs every colour that is not deleted keeps its count. Same edit as upstream PR #61 (issue #10, marked fixed but not).",
+      "edits": [
+        {"split": "train", "pair": 1, "grid": "output", "cells": [[4, 5, 2, 0]]}
+      ]
+    },
+    {
+      "task": "a6f40cea", "upstream_sha256": "dcdb1b412b1750794bf5d829b2c52e5cd73335a193812ba7264ce6e0dbc8a52e",
+      "kind": "train_error",
+      "why": "train 2: the restored part of the 8/9 striped frame is in the opposite phase to the frame's visible cells on the same edges (the alternation breaks across the hidden cell); the 4/5 frame in the same pair and the test's 4/9 frame continue the visible phase. Same edit as upstream PR #64 (issue #73, closed by the maintainer as not worth fixing).",
+      "edits": [
+        {"split": "train", "pair": 2, "grid": "output",
+         "cells": [[5, 1, 8, 9], [5, 2, 9, 8], [5, 3, 8, 9], [5, 4, 9, 8], [5, 5, 8, 9], [5, 6, 9, 8], [5, 7, 8, 9], [6, 1, 9, 8]]}
+      ]
+    },
+    {
+      "task": "1ae2feb7", "upstream_sha256": "2e1d9c2ffed3b8b16a31640c8f1515b23fca1897f12ec6dd2b9d307f81455354",
+      "kind": "test_cosmetic",
+      "why": "test 0: the divider column 5 misses its bottom cell (9,5) in input and output; every other divider in the task is a full line. A transform that copies the divider gets the same answer either way. Same edit as upstream PR #40 (declined).",
+      "edits": [
+        {"split": "test", "pair": 0, "grid": "input", "cells": [[9, 5, 0, 4]]},
+        {"split": "test", "pair": 0, "grid": "output", "cells": [[9, 5, 0, 4]]}
+      ]
+    },
+    {
+      "task": "53fb4810", "upstream_sha256": "be452b59b6ce5e261761fecec7c59d00451bea28a6ee359a7063179803cf8de7",
+      "kind": "test_cosmetic",
+      "why": "test 0: the existing 4/6 stripe in column 3 has rows 23 and 24 swapped in input and output (it alternates 4,6,4,6 from row 7 down). A transform that copies the stripe gets the same answer either way. Same edit as upstream PR #50 (declined).",
+      "edits": [
+        {"split": "test", "pair": 0, "grid": "input", "cells": [[23, 3, 6, 4], [24, 3, 4, 6]]},
+        {"split": "test", "pair": 0, "grid": "output", "cells": [[23, 3, 6, 4], [24, 3, 4, 6]]}
+      ]
+    }
+  ],
+  "reviewed_not_changed": {
+    "7ed72f31": "upstream issue #57: the red mirror line of test 1 stops at row 20 while the shape reaches row 21. The reflection does not depend on the line's length and train shows a single line, so this is not clearly an error.",
+    "5dbc8537": "upstream issue #46 is about the website's grid-size label, not the data.",
+    "291dc1e1": "upstream issue #45 (more than one reading): 12 of 14 QAD rounds give the official answer; no alternative is accepted.",
+    "9bbf930d": "never solved in 14 QAD rounds although 13 pass train; the wrong answers split into several clusters (2, 4, 10 cells), not one alternative reading. Seed reconstruction passes train and test."
+  }
+}

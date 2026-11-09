@@ -1,0 +1,9 @@
+# c9: c0p + reasoning trim + compaction tail (= c4's proxy parameters)
+--trim-reasoning-at
+80000
+--trim-keep-items
+8
+--trim-min-gain
+15000
+--carry-tail-tokens
+10000

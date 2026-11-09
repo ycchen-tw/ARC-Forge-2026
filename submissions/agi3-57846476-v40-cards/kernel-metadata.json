@@ -1,0 +1,37 @@
+{
+  "id": "threerabbits/arc-code-hs110-v14tk5an-cards-swv8",
+  "id_no": 141946521,
+  "title": "arc code hs110 v14tk5an cards swv8",
+  "code_file": "arc-code-hs110-v14tk5an-cards-swv8.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "keywords": [
+    "gpu"
+  ],
+  "dataset_sources": [
+    "threerabbits/agent-wheels-scipy-1-18-1",
+    "threerabbits/arc-code-kaggle-assets",
+    "threerabbits/arcforge-codex-0154-p8",
+    "threerabbits/hs110-draft-vocab",
+    "threerabbits/humming-kernels-0116",
+    "threerabbits/pip-offline-wheel",
+    "threerabbits/qwen38fn-dflash-planb-l8-s25562-fp8",
+    "threerabbits/qwen38fn-sglang-0520-sm120-cp312",
+    "threerabbits/sglang-arc-2-tree-allmerge-1020",
+    "threerabbits/zstd-x86-64-kaggle"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "arc-prize-2026-arc-agi-3"
+  ],
+  "model_sources": [
+    "threerabbits/qwen38fn-gean320-int3-gptq/Transformers/default/3",
+    "threerabbits/qwen38fn-int3-arc3v8-v20-delta/Transformers/default/1"
+  ],
+  "docker_image": "gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b88387388fade02bfa8bf3fc647d461",
+  "machine_shape": "NvidiaRtxPro6000"
+}

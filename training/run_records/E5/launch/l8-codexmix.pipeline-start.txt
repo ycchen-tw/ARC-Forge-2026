@@ -1,0 +1,4 @@
+· capture server 0 ready on GPU 3 (port 30931)
+· capture server 1 ready on GPU 4 (port 30932)
+· capture server 2 ready on GPU 5 (port 30933)
+· trainer on GPUs 0,1,2; following $ARC_RUNS/qwen38fn_dflash/20261020-l8-codexmix/trainer.log

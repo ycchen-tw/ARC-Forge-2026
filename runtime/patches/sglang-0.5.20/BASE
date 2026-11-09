@@ -1,0 +1,6 @@
+# Upstream base of this directory's patches. tools/apply_patches.sh and work/qwen38fn_eval/build_sglang_0520.sh both read this file;
+# the git HEAD of the installed sglang source must start with REF, otherwise applying is refused.
+PKG=sglang
+CHECK=git-sha
+REF=94602c9c2b7cbdb8efd5c52802dac6a1c180089e
+# = tag v0.5.20

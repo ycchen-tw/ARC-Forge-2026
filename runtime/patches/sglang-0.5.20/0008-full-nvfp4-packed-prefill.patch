@@ -1,0 +1,170 @@
+From 470aa957c49383cd1174e74d9ea785d1cc903a94 Mon Sep 17 00:00:00 2001
+From: arc <a@b.c>
+Date: Sat, 19 Sep 2026 07:37:51 +0000
+Subject: [PATCH 1/7] arc: 0023-full-nvfp4-packed-prefill
+
+(cherry picked from commit 1b98db4359754dd7083f2919a7a5b8c1bace19c5)
+---
+ .../layers/attention/flashinfer_backend.py    | 24 +++++++++++++++----
+ .../quantization/fp4_kv_cache_quant_method.py | 11 ++++++++-
+ .../srt/mem_cache/kv_cache_configurator.py    |  3 +++
+ python/sglang/srt/mem_cache/memory_pool.py    |  4 ++++
+ .../srt/model_executor/pool_configurator.py   |  3 +++
+ 5 files changed, 40 insertions(+), 5 deletions(-)
+
+diff --git a/python/sglang/srt/layers/attention/flashinfer_backend.py b/python/sglang/srt/layers/attention/flashinfer_backend.py
+index 140a571c..ac72c550 100644
+--- a/python/sglang/srt/layers/attention/flashinfer_backend.py
++++ b/python/sglang/srt/layers/attention/flashinfer_backend.py
+@@ -349,6 +349,12 @@ class FlashInferAttnBackend(AttentionBackend):
+             access is not None and access.scale_recipe == "nvfp4"
+             for access in (self.prefill_kv_access, self.decode_kv_access)
+         )
++        self.arc_native_nvfp4 = (
++            os.environ.get("ARC_FULL_NVFP4") == "1" and self.is_nvfp4_kvcache
++        )
++        if self.arc_native_nvfp4:
++            assert not self.prefill_uses_dequant_workspace
++            logger.info("ARC_FULL_NVFP4_PREFILL=fa2_packed; no full dequant workspace")
+         self.dq_page_table = None
+         self.dq_paged_kernel_lens = None
+         self.cpu_req_pool_indices = None
+@@ -359,7 +365,7 @@ class FlashInferAttnBackend(AttentionBackend):
+                 self.prefill_uses_dequant_workspace
+                 or self.decode_uses_dequant_workspace
+             )
+-            else model_runner.kv_cache_dtype
++            else (torch.uint8 if self.arc_native_nvfp4 else model_runner.kv_cache_dtype)
+         )
+ 
+         # Parse constants
+@@ -1315,7 +1321,14 @@ class FlashInferAttnBackend(AttentionBackend):
+ 
+         # We perform dequant for chunk prefill/cache reuse.
+         pool = self.token_to_kv_pool
+-        if self.prefill_uses_dequant_workspace:
++        arc_kv_kwargs = {}
++        if self.arc_native_nvfp4:
++            if self.forward_metadata.use_ragged or layer.is_cross_attention:
++                raise RuntimeError("Native NVFP4 requires paged self-attention prefill")
++            kp, vp, ks, vs = pool.get_raw_kv_buffer(layer.layer_id)
++            kv_cache = (kp, vp)
++            arc_kv_kwargs["kv_cache_sf"] = (ks, vs)
++        elif self.prefill_uses_dequant_workspace:
+             kv_cache = pool.get_flashinfer_dequant_workspace_kv_buffer(
+                 layer,
+                 self.req_to_token_pool.req_to_token,
+@@ -1368,8 +1381,11 @@ class FlashInferAttnBackend(AttentionBackend):
+                 ),
+                 logits_soft_cap=logits_soft_cap,
+                 # Must use _float to avoid device-to-host copy that breaks cuda graph capture.
+-                k_scale=layer.k_scale_float,
+-                v_scale=layer.v_scale_float,
++                k_scale=(self.kv_cache_quant_method.get_bmm_scales(layer.layer_id)[0]
++                         if self.arc_native_nvfp4 else layer.k_scale_float),
++                v_scale=(self.kv_cache_quant_method.get_bmm_scales(layer.layer_id)[1]
++                         if self.arc_native_nvfp4 else layer.v_scale_float),
++                **arc_kv_kwargs,
+             )
+         else:
+             # If `k`/`v` are not explicitly provided, fall back to the KV cache stored in
+diff --git a/python/sglang/srt/layers/quantization/fp4_kv_cache_quant_method.py b/python/sglang/srt/layers/quantization/fp4_kv_cache_quant_method.py
+index 2a4487e2..1f4ffd48 100644
+--- a/python/sglang/srt/layers/quantization/fp4_kv_cache_quant_method.py
++++ b/python/sglang/srt/layers/quantization/fp4_kv_cache_quant_method.py
+@@ -33,6 +33,7 @@ Why do we need attention access rules?
+   combination is unsupported.
+ """
+ 
++import os
+ from abc import ABC, abstractmethod
+ from dataclasses import dataclass
+ from enum import Enum
+@@ -523,6 +524,12 @@ class NVFP4KVCacheMethod(KVCacheQuantMethodBase):
+             else None
+         )
+ 
++        if os.environ.get("ARC_FULL_NVFP4") == "1":
++            assert dq_k_buffer is None and dq_v_buffer is None
++            packed_bytes = sum(t.numel() * t.element_size() for group in
++                               (k_buffer, v_buffer, k_scale_buffer, v_scale_buffer) for t in group)
++            print(f"ARC_NVFP4_POOL slots={m} layers={layer_num} heads={n} dim={k} "
++                  f"packed_bytes={packed_bytes} dequant_bytes=0", flush=True)
+         return {
+             "k_buffer": k_buffer,
+             "v_buffer": v_buffer,
+@@ -837,7 +844,9 @@ KV_CACHE_ATTENTION_ACCESS_REGISTRY: dict[str, tuple[KVCacheAttentionAccess, ...]
+         _plain(_DECODE, _CPU_FP8_BACKENDS),
+     ),
+     NVFP4KVCacheMethod.name: (
+-        _dq_workspace(_PREFILL, _NVFP4_PREFILL_BACKENDS, _NVFP4_SCALE, _FP8_E4M3),
++        (_native_fp4(_PREFILL, _NVFP4_PREFILL_BACKENDS, _NVFP4_SCALE, torch.uint8)
++         if os.environ.get("ARC_FULL_NVFP4") == "1"
++         else _dq_workspace(_PREFILL, _NVFP4_PREFILL_BACKENDS, _NVFP4_SCALE, _FP8_E4M3)),
+         _native_fp4(_DECODE, _NVFP4_DECODE_BACKENDS, _NVFP4_SCALE, _TORCH_FP4),
+     ),
+     FP4MXBlock16KVCacheMethod.name: (
+diff --git a/python/sglang/srt/mem_cache/kv_cache_configurator.py b/python/sglang/srt/mem_cache/kv_cache_configurator.py
+index 7fedaaf2..80f58165 100644
+--- a/python/sglang/srt/mem_cache/kv_cache_configurator.py
++++ b/python/sglang/srt/mem_cache/kv_cache_configurator.py
+@@ -3,6 +3,7 @@ from __future__ import annotations
+ import gc
+ import logging
+ import math
++import os
+ from dataclasses import dataclass, field
+ from typing import TYPE_CHECKING, Any, Optional
+ 
+@@ -1890,6 +1891,8 @@ class KVCacheConfigurator:
+         )
+ 
+         qsa_profile = parse_qsa_profile(self.model_config.hf_config)
++        if os.environ.get("ARC_FULL_NVFP4") == "1":
++            qsa_profile = None  # No idle QSA cache or its token budget in full mode.
+         if qsa_profile is None:
+             pool_class = HybridLinearKVPool
+             extra_args["use_mla"] = self.use_mla_backend
+diff --git a/python/sglang/srt/mem_cache/memory_pool.py b/python/sglang/srt/mem_cache/memory_pool.py
+index 28333dff..5a1f3fc1 100644
+--- a/python/sglang/srt/mem_cache/memory_pool.py
++++ b/python/sglang/srt/mem_cache/memory_pool.py
+@@ -4151,6 +4151,8 @@ class HybridLinearKVPool(KVCache):
+             )
+ 
+     def get_v_head_dim(self):
++        if os.environ.get("ARC_FULL_NVFP4") == "1" and self.full_kv_pool.quant_method.name == "nvfp4":
++            return self.full_kv_pool.v_head_dim  # Logical width, not packed byte width.
+         # Use start_layer to handle pipeline parallelism where layer 0
+         # may not be present in this stage's buffer.
+         return self.full_kv_pool.get_value_buffer(self.full_kv_pool.start_layer).shape[
+@@ -5697,6 +5699,8 @@ class MiniMaxSparseKVPool(KVCache):
+         )
+ 
+     def get_v_head_dim(self):
++        if os.environ.get("ARC_FULL_NVFP4") == "1" and self.full_kv_pool.quant_method.name == "nvfp4":
++            return self.full_kv_pool.v_head_dim  # Logical width, not packed byte width.
+         # Use start_layer to handle pipeline parallelism where layer 0
+         # may not be present in this stage's buffer.
+         return self.main_pool.get_value_buffer(self.main_pool.start_layer).shape[-1]
+diff --git a/python/sglang/srt/model_executor/pool_configurator.py b/python/sglang/srt/model_executor/pool_configurator.py
+index e3b08c0a..346e7284 100644
+--- a/python/sglang/srt/model_executor/pool_configurator.py
++++ b/python/sglang/srt/model_executor/pool_configurator.py
+@@ -14,6 +14,7 @@ Two entry points, same core computation:
+ from __future__ import annotations
+ 
+ import logging
++import os
+ from bisect import bisect_right
+ from dataclasses import dataclass
+ from typing import TYPE_CHECKING, Optional
+@@ -440,6 +441,8 @@ class DefaultPoolConfigurator(MemoryPoolConfigurator):
+         if num_layers == 0:
+             return 0
+         qsa_profile = parse_qsa_profile(hf_config)
++        if os.environ.get("ARC_FULL_NVFP4") == "1":
++            qsa_profile = None  # No idle QSA cache or its token budget in full mode.
+         if qsa_profile is None:
+             return 0
+         return QSATokenToKVPool.qsa_bytes_per_token(

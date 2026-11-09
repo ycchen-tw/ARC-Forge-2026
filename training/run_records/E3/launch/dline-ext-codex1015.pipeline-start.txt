@@ -1,0 +1,7 @@
+· capture server 0 ready on GPU 2 (port 30801)
+· capture server 1 ready on GPU 3 (port 30802)
+· trainer on GPUs 0,1; following $ARC_RUNS/qwen38fn_dflash/20261017-dline-ext-codex1015/trainer.log
+· resuming from $ARC_RUNS/qwen38fn_dflash/20261017-dline-ext-codex1015/trainer/step-000006000 (7648 jobs consumed)
+· capture server 0 ready on GPU 2 (port 30801)
+· capture server 1 ready on GPU 3 (port 30802)
+· trainer on GPUs 0,1; following $ARC_RUNS/qwen38fn_dflash/20261017-dline-ext-codex1015/trainer.log

@@ -1,0 +1,1206 @@
+{
+ "schema": "arc-forge training lineage map v1",
+ "source_rev": "arc-forge origin/main dc8cccf40e9272c0cd425c59a9d9e618619c256d (staged files identical at ade072fe3)",
+ "layout": "paths are relative to this directory, which mirrors the arc-forge repo root; doc paths (docs/...) refer to the arc-forge repo and are not staged",
+ "final_models": {
+  "qwen38fn-gean320-int3-gptq v3 (QAD R)": [
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "A5",
+   "B1",
+   "B2",
+   "B3",
+   "B4",
+   "B5",
+   "B6"
+  ],
+  "qwen38fn-int3-arc2r4-v30-patch v1": [
+   "C1",
+   "C2",
+   "C3"
+  ],
+  "qwen38fn-int3-arc3v8-v20-delta v1": [
+   "D1",
+   "D2",
+   "D3",
+   "D4"
+  ],
+  "qwen38fn-dflash-planb-l8-s25562-fp8": [
+   "E1",
+   "E2",
+   "E3",
+   "E4",
+   "E5",
+   "E6"
+  ],
+  "training data producers": [
+   "A1",
+   "F1",
+   "F2",
+   "F3",
+   "F4",
+   "F5"
+  ]
+ },
+ "steps": [
+  {
+   "step": "A1",
+   "purpose": "Collect TITO session ledgers (exact token ids, media, MoE routing) from Qwen3.8-Flash-Next FP8 running the codex ARC harnesses; these ledgers are the calibration data for expert pruning and INT3 GPTQ.",
+   "entry_points": [
+    "work/arc_code/arc2/run_arc2.py",
+    "work/arc_code/run_arm.py",
+    "work/tito/collect/nfs_move.py",
+    "src/arcforge/tito/"
+   ],
+   "configs": [
+    "work/arc_code/arc2/configs/node1-tito-collect-jail.json",
+    "work/arc_code/configs/node1-tito-collect-arc3.json"
+   ],
+   "commands": [],
+   "inputs": [
+    "Qwen3.8-Flash-Next-FP8 (official FP8, $ARC_NFS/models/Qwen3.8-Flash-Next-FP8; tokenizer path in node1-tito-collect-arc3.json)",
+    "ARC-AGI-2 pools training1000, nvarc_training, independent1000, synth108 ($ARC_DATA/arc2_pools/<pool>)",
+    "ARC-AGI-3 public 25 games"
+   ],
+   "outputs": [
+    "$ARC_NFS/runs/tito/20261006-node1-collect/ (ledger/<instance>, media and run dirs as .tar.zst; docs/journal/2026-10.md:697)"
+   ],
+   "run_records": "run_records/A1/ -- launch/lane.sh (the run_arc2.py / run_arm.py command lines), launch_server.sh, chain_arc3.sh, arc2-jail-codex.sh (the codex bwrap wrapper); config/ the two servers' server.json (full server_args); lists/arc2_batches.tsv (pool + ids of the 71 batches); code/build_nvarc_pool.py",
+   "gaps": [
+    "The run_arc2.py / run_arm.py command lines of the 10-06 collection are not in git (docs/journal/2026-10.md:694-699 describes the run only).",
+    "Server: sglang-arc-2 fork 5c99db5c with --session-replay --session-ledger-dir --session-ledger-routing (fork not in this tree; config note field).",
+    "codex bwrap wrapper codex-0.154.0-p7/arc2-jail/bin/codex is not in the repo (node1-tito-collect-jail.json note)."
+   ]
+  },
+  {
+   "step": "A2",
+   "purpose": "Replay the ledgers through a capture server, accumulate per-expert, per-token-class saliency (N, sum g, sum ||f||, sum ||f||^2, sum g||f||), and select the gEAN 512->320 expert mask (ean_all, sha256 5757e975...).",
+   "entry_points": [
+    "work/qwen38fn_dflash/reap_plan.py",
+    "work/qwen38fn_dflash/reap_server.sh",
+    "work/qwen38fn_dflash/reap_runtime.py",
+    "work/qwen38fn_dflash/reap_capture.py",
+    "work/qwen38fn_eval/reap_mm_select.py",
+    "work/qwen38fn_eval/probes/reap_mix_mask.py",
+    "work/qwen38fn_eval/probes/reap_mask_variants.py",
+    "work/qwen38fn_eval/reap_mm_fidelity.py"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "python work/qwen38fn_dflash/reap_plan.py inventory --ledger $RAM/ledger/<instance> ... --model-dir <FP8 512E> --context-length 262144 --out $R/inventory",
+     "source": "docs/research/qwen38fn_reap_mm_20261009.md:328-329"
+    },
+    {
+     "cmd": "python work/qwen38fn_dflash/reap_plan.py plan --inventory $R/inventory/items.jsonl --out $R/plan-v1 --calib-tokens 20e6 --heldout-tokens 3e6 --diag-tokens 8e6",
+     "source": "docs/research/qwen38fn_reap_mm_20261009.md:330-331"
+    },
+    {
+     "cmd": "GPUS=4,5 PORT=30690 ROOT=$RAM/root PROFILE=$RAM/ledger/<instance>/server.json MODEL_PATH=<FP8 512E copy> PIDFILE=$R/server.pid bash work/qwen38fn_dflash/reap_server.sh",
+     "source": "docs/research/qwen38fn_reap_mm_20261009.md:334-335"
+    },
+    {
+     "cmd": "python work/qwen38fn_dflash/reap_capture.py --plan $R/plan-v1/plan.jsonl --split calib --url http://127.0.0.1:30690 --root $RAM/root --out $R/jobs/calib --ledger-root $RAM/ledger --image-detail high --check-routing 20",
+     "source": "docs/research/qwen38fn_reap_mm_20261009.md:336-337"
+    },
+    {
+     "cmd": "python work/qwen38fn_eval/reap_mm_select.py --calib $R/jobs/calib --heldout $R/jobs/heldout --diag $R/jobs/diag --keep 320 --incumbent <incumbent checkpoint>/prune_manifest.json --out $R/select-v1",
+     "source": "docs/research/qwen38fn_reap_mm_20261009.md:340-341"
+    },
+    {
+     "cmd": "python work/qwen38fn_eval/probes/reap_mix_mask.py --calib $R/jobs/calib --diag $R/jobs/diag --keep 320 --out $R/mix-v1",
+     "source": "docs/research/qwen38fn_reap_mm_20261009.md:342"
+    },
+    {
+     "cmd": "python work/qwen38fn_eval/probes/reap_mask_variants.py --calib $R/jobs/calib --diag $R/jobs/diag --mix $R/mix-v1 --out $R/variants-v1   # v2, v3 via --only",
+     "source": "docs/research/qwen38fn_reap_mm_20261009.md:343-344"
+    },
+    {
+     "cmd": "python work/qwen38fn_dflash/reap_capture.py ... --split heldout --out $R/fid/heldout/ean_all --logprobs --router-mask $R/variants-v3/masks/ean_all.pt",
+     "source": "docs/research/qwen38fn_reap_mm_20261009.md:347-348"
+    },
+    {
+     "cmd": "python work/qwen38fn_eval/reap_mm_fidelity.py --base $R/fid/diag/base --cand incumbent=$R/fid/diag/incumbent --cand ean_all=$R/fid/diag/ean_all ... --only-groups $R/mix-v1/groups_B.txt --out $R/fidelity-variants-B.json",
+     "source": "docs/research/qwen38fn_reap_mm_20261009.md:349-350"
+    }
+   ],
+   "inputs": [
+    "A1 ledgers ($ARC_RAM_RUNS/tito/20261006-node1-collect/ledger/, NFS copy $ARC_NFS/runs/tito/20261006-node1-collect/)",
+    "Qwen3.8-Flash-Next-FP8 512E (capture server, GPU TP2/EP2)",
+    "incumbent REAP320 prune_manifest.json ($ARC_NFS/models/Qwen3.8-Flash-Next-NVFP4-nvidia-reap320-arccode)"
+   ],
+   "outputs": [
+    "$R/variants-v3/masks/ean_all.pt (gEAN320 main mask, sha256 5757e975...)",
+    "$R/select-v1/masks/reap320_incumbent_mtp.pt (MTP mask, reused from the incumbent)",
+    "R=$ARC_RUNS/qwen38fn_eval/20261009-reap-mm"
+   ],
+   "run_records": "run_records/A2/ -- launch/run_capture.sh and capture-server.txt (the capture server flags); config/ inventory and plan-v1 metadata (reap_plan.py arguments); lists/plan.jsonl and the mix-v1 game groups",
+   "gaps": [
+    "Per-step run scripts $R/run_capture.sh, $R/run_fidelity*.sh are in the run directory, not in git (docs/research/qwen38fn_reap_mm_20261009.md:323).",
+    "Capture server ran sglang-arc-2 4b57f3c45 (lock target b200-qwen38fn) from branch qwen38fn-reap-mm (docs/research/qwen38fn_reap_mm_20261009.md:321); the fork is not in this tree."
+   ]
+  },
+  {
+   "step": "A3",
+   "purpose": "Prune the NVIDIA NVFP4 512E checkpoint to 320 experts with the gEAN mask (EAN320-v1) and verify it against the incumbent layout; its prune_manifest keep lists define the expert order of the INT3 package.",
+   "entry_points": [
+    "work/qwen38fn_eval/prune_experts.py",
+    "work/qwen38fn_eval/probes/verify_pruned_vs_incumbent.py",
+    "work/qwen38fn_eval/probes/smoke_mm.py"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "python work/qwen38fn_eval/prune_experts.py --src <NVFP4 512E> --mask $R/variants-v3/masks/ean_all.pt --mtp-mask $R/select-v1/masks/reap320_incumbent_mtp.pt --out <out> --shard-bytes $((5*1024**3))",
+     "source": "docs/research/qwen38fn_reap_mm_20261009.md:353-354"
+    },
+    {
+     "cmd": "python work/qwen38fn_eval/probes/verify_pruned_vs_incumbent.py --src <NVFP4 512E> --out <out> --incumbent $ARC_NFS/models/Qwen3.8-Flash-Next-NVFP4-nvidia-reap320-arccode",
+     "source": "docs/research/qwen38fn_reap_mm_20261009.md:355-356"
+    },
+    {
+     "cmd": "python work/qwen38fn_eval/probes/smoke_mm.py --url http://127.0.0.1:<port> --model <served name> --ffmpeg <ffmpeg>",
+     "source": "docs/research/qwen38fn_reap_mm_20261009.md:357"
+    }
+   ],
+   "inputs": [
+    "nvidia/Qwen3.8-Flash-Next-NVFP4 (512E; $ARC_MODELS/../Qwen3.8-Flash-Next-NVFP4-nvidia, work/qwen38fn_eval/README.md:272-277)",
+    "A2 masks ean_all.pt, reap320_incumbent_mtp.pt"
+   ],
+   "outputs": [
+    "Qwen3.8-FN-NVFP4-EAN320-v1 (106.2 GB, 20 shards; node2 /dev/shm/uid-$UID/models/, docs/research/qwen38fn_reap_mm_20261009.md:288-290)"
+   ],
+   "run_records": "run_records/A3/ -- launch/run_final.sh (prune_experts.py and verify_pruned_vs_incumbent.py command lines) and run_final.args.txt (mask sha256, output path)",
+   "gaps": [
+    "$R/run_final.sh (the wrapper that ran these three commands) is not in git (docs/research/qwen38fn_reap_mm_20261009.md:289)."
+   ]
+  },
+  {
+   "step": "A4",
+   "purpose": "One-shot INT3 GPTQ (Humming uint3 g128, no zero point) of the 48x320 routed experts: replay 50 ARC-AGI-2 training ledger segments (2,004,330 tokens, 389 images) through an FP8 calibration server with a Hessian hook, 8 windows x 6 layers.",
+   "entry_points": [
+    "work/qwen38fn_eval/run_gean_int3_mm.py",
+    "work/qwen38fn_eval/direct_checkpoint.py",
+    "work/qwen38fn_eval/quantize_int3_gptq.py",
+    "work/qwen38fn_eval/gptq_int3.py",
+    "work/qwen38fn_eval/gptq_hess_hook.py",
+    "work/qwen38fn_dflash/feed_int3_mm_calib.py",
+    "work/qwen38fn_dflash/int3_mm_calib_runtime.py",
+    "work/qwen38fn_dflash/capture_tito.py",
+    "work/qwen38fn_dflash/capture_tito_runtime.py"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "python work/qwen38fn_eval/run_gean_int3_mm.py run --source-root ... --fork ... --python ... --fp8-model ... --bf16-source ... --mask ... --mtp-mask ... --plan ... --fork-sha ... --run-id ... --port ... [--gpus 0,1,2,3 --window 6 --target-tokens 2000000 --resident-cache-only]",
+     "source": "work/qwen38fn_eval/run_gean_int3_mm.py:457-471 (argparse; the run's launch.sh is not in git)"
+    },
+    {
+     "cmd": "python direct_checkpoint.py stage-bf16 --src $ARC_NFS/models/Qwen3.8-Flash-Next --out <windows/w00/bf16> --mask <inputs/gean320.pt> --layers 0:6 --stall-seconds 120 --free-floor-bytes 21474836480 --resident-cache-only",
+     "source": "work/qwen38fn_eval/results/gean320_int3_stop_20261009.json:56-73 (phase command recorded by the orchestrator of the stopped first attempt 01a1206d; not staged, results/)"
+    }
+   ],
+   "inputs": [
+    "Qwen3.8-Flash-Next BF16 ($ARC_NFS/models/Qwen3.8-Flash-Next)",
+    "Qwen3.8-Flash-Next-FP8 pruned to gEAN320 as the calibration model (calib-fp8, reused from run 01a1206d, docs/research/gean320_int3_handoff_20261009.md:65)",
+    "A2 masks (main + MTP), A1 ledgers (ARC-AGI-2 training1000 + nvarc_training, 25 segments each)"
+   ],
+   "outputs": [
+    "$ARC_RUNS/qwen38fn_eval/20261009-gean320-int3-mm-2a34605e/parts/ (48 layers, 38.9 GB; docs/research/gean320_int3_handoff_20261009.md:62)",
+    "gptq_calibration.json in the same run dir"
+   ],
+   "run_records": "run_records/A4/ -- launch/launch.sh and events.jsonl (every child command line); config/ identity, source commit, gptq_calibration.json, per-window complete json, and the inputs reused from the stopped attempt 01a1206d; lists/calib-selection.json",
+   "gaps": [
+    "The 2a34605e run's launch.sh and orchestrator/ logs are in the run directory, not in git (docs/research/gean320_int3_handoff_20261009.md:62).",
+    "Calibration server fork cd15559a (sglang-src of run 01a1206d, docs/research/gean320_int3_handoff_20261009.md:65) is not in this tree."
+   ]
+  },
+  {
+   "step": "A5",
+   "purpose": "Repackage the INT3 parts, the existing block-FP8 dense projections and BF16 tensors into the HF deploy package qwen38fn-gean320-int3-gptq (18 x 5 GiB shards, no MTP); this is Kaggle model v1 / HF ycchen/qwen38fn-gean320-int3-gptq@27940203.",
+   "entry_points": [
+    "work/qwen38fn_eval/export_int3_sidecar.py",
+    "work/qwen38fn_eval/build_int3_deploy.py",
+    "work/qwen38fn_eval/quantize_nonmoe_fp8.py",
+    "work/qwen38fn_eval/int3_deploy_runtime.py"
+   ],
+   "configs": [
+    "work/qwen38fn_eval/int3_tuning/b200-w3a8-k456-humming0112.json"
+   ],
+   "commands": [
+    {
+     "cmd": "build_int3_deploy.py --sidecar <dir> --source <checkpoint> --dense-fp8 <dense_fp8.safetensors> --dense-manifest <int3_manifest.json> --out <dir> [--bf16 ...] [--gptq-manifest ...] [--pruning-calibration-manifest ...] [--validation-notes ...] --drop-mtp --shard-bytes <n>",
+     "source": "work/qwen38fn_eval/build_int3_deploy.py:408-415 (argparse; the packaging script is not in git)"
+    },
+    {
+     "cmd": "export_int3_sidecar.py --parts <dir> --deployed <pruned checkpoint> --bf16 <BF16 source> --run-id <id> --calib-sha256 <sha> --out <dir> --hessian one-shot [--dense-source ...] [--calibration-manifest ...] [--pruning-manifest ...]",
+     "source": "work/qwen38fn_eval/export_int3_sidecar.py:68-81 (argparse)"
+    }
+   ],
+   "inputs": [
+    "A4 parts",
+    "A3 EAN320-v1 prune_manifest.json (expert order)",
+    "REAP320 sidecar dense_fp8.safetensors (sha 7dfd0cf0..., $ARC_NFS/models/Qwen3.8-Flash-Next-INT3GPTQ-seq-reap320-arccode-sidecar/; docs/research/gean320_int3_handoff_20261009.md:22, docs/research/qwen38fn_int3_gptq_reap320_20261008.md:97-102)",
+    "BF16 non-expert tensors copied from the NVIDIA NVFP4 gEAN320 shell (docs/research/gean320_int3_handoff_20261009.md:23)"
+   ],
+   "outputs": [
+    "HF private ycchen/qwen38fn-gean320-int3-gptq@27940203 (88.98 GB) = Kaggle threerabbits/qwen38fn-gean320-int3-gptq/Transformers/default/1 (docs/research/gean320_int3_handoff_20261009.md:10-12)"
+   ],
+   "run_records": "run_records/A5/ -- launch/post_gptq.sh (the export_int3_sidecar.py invocation), build.sh, rebuild.sh, rebuild_kaggle.sh, upload_hf.py; config/source_int3_manifest.json",
+   "gaps": [
+    "The packaging/upload scripts are in run_records/A5/launch/ (from $ARC_RUNS/qwen38fn_eval/20261009-gean320-int3-deploy/), not in work/.",
+    "The export_int3_sidecar.py invocation is in run_records/A5/launch/post_gptq.sh (also rebuild.sh / rebuild_kaggle.sh), not in git."
+   ]
+  },
+  {
+   "step": "B1",
+   "purpose": "Build the QAD student base: the A5 package with its 144 block-FP8 dense projections restored to BF16 masters (gean320-int3-bf16dense).",
+   "entry_points": [
+    "work/qwen38fn_eval/build_int3_bf16dense.py"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "python build_int3_bf16dense.py --package P --bf16-source S --out O",
+     "source": "work/qwen38fn_eval/build_int3_bf16dense.py:16"
+    }
+   ],
+   "inputs": [
+    "A5 package (gean320-int3-gptq)",
+    "official FP8 checkpoint as the dense source (docs/plans/qwen38fn_gean320_w3a8_joint_qad_v2_20261015.md:117)"
+   ],
+   "outputs": [
+    "$ARC_RAM_RUNS/qwen38fn_qad/models/gean320-int3-bf16dense (hardlinked next to gean320-int3-gptq)"
+   ],
+   "gaps": []
+  },
+  {
+   "step": "B2",
+   "purpose": "Collect student trajectories: the deployed gEAN320 INT3 W3A8 model at T0.7 on 5 replicas with --session-ledger-all, ARC-AGI-2 pools x 6 codex prompt variants (run_arc2_seq ind/refine_exp/rerefine) and ARC-AGI-3 community games x 10 arms; convert ledgers to tito-mm.",
+   "entry_points": [
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/serve_replica.sh",
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/start_feeders.sh",
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/arc2/feeder.py",
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/arc2/run_batch.sh",
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/arc3/feeder.py",
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/arc3/launch_arm2.sh",
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/watch.py",
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/offload.py",
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/prep_1019.sh",
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/prep_1022.sh",
+    "work/qwen38fn_lora/prepare_tito_mm.py",
+    "work/arc_code/arc2/run_arc2_seq.py",
+    "work/arc_code/run_arm.py",
+    "work/arc_code/sampling_proxy.py"
+   ],
+   "configs": [
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/arc2/configs/",
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/arc3/configs/",
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/arc2/limits.json",
+    "work/qwen38fn_qad/probes/student_traj_1022/collect/arc3/limits.json"
+   ],
+   "commands": [
+    {
+     "cmd": "bash serve_replica.sh <gpu> <port> <think budget, 0=off>",
+     "source": "work/qwen38fn_qad/probes/student_traj_1022/collect/serve_replica.sh:6"
+    },
+    {
+     "cmd": "work/arc_code/arc2/run_arc2_seq.py --config $R/arc2/configs/$6.json --run-dir $R/arc2/$3 --tasks-dir $dir --only $2 --pool-label $1 --agent-python $ARC_RUNS/arc_code/agent-runtime/bin/python --driver-bin $(dirname $ARC_CODEX_PREFIX)/arc2-jail --model-base-url http://127.0.0.1:$4/v1 --model qwen38fn --tokenizer-json $R/tokenizer.json --concurrency $5 --arms ind,refine_exp,rerefine --solvers-first",
+     "source": "work/qwen38fn_qad/probes/student_traj_1022/collect/arc2/run_batch.sh:10-18"
+    },
+    {
+     "cmd": "python work/qwen38fn_lora/prepare_tito_mm.py --device cpu-exact --ledger $S/ledger/p309* --model /dev/shm/uid-$UID/models/qwen38fn-gean320-int3-gptq --out $S/data1022 --manifests ... --workers 24 --max-gb 200",
+     "source": "work/qwen38fn_qad/probes/student_traj_1022/collect/prep_1022.sh:10-12"
+    },
+    {
+     "cmd": "python work/qwen38fn_lora/prepare_tito_mm.py --device cpu-exact --ledger $S/ledger1019/p309* --model /dev/shm/uid-$UID/models/qwen38fn-gean320-int3-gptq --out $S/data1019 --manifests ... --workers 24 --max-gb 200",
+     "source": "work/qwen38fn_qad/probes/student_traj_1022/collect/prep_1019.sh:10-12"
+    }
+   ],
+   "inputs": [
+    "A5 package served W3A8 (sglang-arc-2-allmerge-b200 ed837597, prep_1022.sh:2)",
+    "ARC-AGI-2 pools training1000, independent1000, synth108, largegrid30, quality300, nvarc_training, nvarc_full ($ARC_DATA/arc2_pools/)",
+    "ARC-AGI-3 community game corpus ($CORPUS for launch_arm2.sh)",
+    "10-19 INT3 collection ledgers $ARC_NFS/runs/tito/20261019-int3-collect/"
+   ],
+   "outputs": [
+    "$S=$ARC_RAM_RUNS/tito/20261022-int3-qad-collect/{data1019,data1022} (tito-mm; docs/research/qwen38fn_qad_student_traj_20261023.md:20-22)"
+   ],
+   "run_records": "run_records/B2/ -- launch/ serve_replica.sh, the 10-19 feeders, run_batch.sh, launch_arm2.sh, start_feeders.sh, prep_1019.sh / prep_1022.sh, and the arc3 rounds launched; config/ the 10-19 arc3 configs and limits; lists/ the arc2 batches launched (int3col = 10-19, qadcol = 10-22)",
+   "gaps": [
+    "The 10-19 INT3 collection's feeders/launchers live in $ARC_RUNS/tito/20261019-int3-collect, not in git.",
+    "ARC-AGI-3 community game corpus and the codex binary/jail wrapper are outside git."
+   ]
+  },
+  {
+   "step": "B3",
+   "purpose": "Filter and merge: drop degenerate segments (>=500 actions with 0 clears; 16-gram loops) and merge the 10-19 and 10-22 tito-mm sets into qadmix-1019-1022.",
+   "entry_points": [
+    "work/qwen38fn_qad/probes/student_traj_1022/filter/analyze.py",
+    "work/qwen38fn_qad/probes/student_traj_1022/filter/timelines.py",
+    "work/qwen38fn_qad/probes/student_traj_1022/filter/lastappend.py",
+    "work/qwen38fn_qad/probes/student_traj_1022/filter/segact.py",
+    "work/qwen38fn_qad/probes/student_traj_1022/filter/merge_filter.py"
+   ],
+   "configs": [
+    "work/qwen38fn_qad/probes/student_traj_1022/filter/results/drop_keys.json"
+   ],
+   "commands": [
+    {
+     "cmd": "python merge_filter.py OUT DROP_KEYS.json DATA [DATA...]",
+     "source": "work/qwen38fn_qad/probes/student_traj_1022/filter/merge_filter.py:1"
+    }
+   ],
+   "inputs": [
+    "B2 data1019, data1022",
+    "collection run recordings (per-step timestamps) for segact/timelines"
+   ],
+   "outputs": [
+    "$S/qadmix-1019-1022 (train 20,200 segments / 1.15B tokens / 723M supervised; validation 374; docs/research/qwen38fn_qad_student_traj_20261023.md:28-30)"
+   ],
+   "gaps": []
+  },
+  {
+   "step": "B4",
+   "purpose": "Teacher targets: the official FP8 512E model scores every supervised position of qadmix and stores top-32 logprobs + tail mass (qad-topk-v1).",
+   "entry_points": [
+    "work/qwen38fn_qad/train_qad.sh",
+    "work/qwen38fn_qad/train_qad.py",
+    "work/qwen38fn_qad/topk_targets.py",
+    "work/qwen38fn_qad/topk_tail_kl.py"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "GPUS=4,5,6,7 OUT=$ARC_RUNS/qwen38fn_qad/<date>-teacher-top32-<data> bash work/qwen38fn_qad/train_qad.sh --mode teacher --model $ARC_NFS/models/Qwen3.8-Flash-Next-FP8 --data <tito-mm data> --bin-tokens 120000",
+     "source": "docs/plans/qwen38fn_gean320_w3a8_joint_qad_v2_20261015.md:107-108"
+    }
+   ],
+   "inputs": [
+    "Qwen3.8-Flash-Next-FP8 512E",
+    "B3 qadmix-1019-1022"
+   ],
+   "outputs": [
+    "$S/teacher-qadmix/targets/{train,validation} (139 GB; NFS copy via collect/backup_after_teacher.sh; docs/research/qwen38fn_qad_student_traj_20261023.md:31-34)"
+   ],
+   "run_records": "run_records/B4/ -- launch/qadcol-teacher.journal.txt (the teacher command: train_qad.sh --mode teacher ...); config/topk.json; GPUs 0-3 and port 29641 in the step README",
+   "gaps": [
+    "The exact qadmix teacher command (systemd unit qadcol-teacher, GPUs 0-3) is not in git; the cited command is the QAD v2 template."
+   ]
+  },
+  {
+   "step": "B5",
+   "purpose": "QAD R: 1000 steps of reverse-KL (KL32_tail) distillation of the INT3 student toward the FP8 teacher, training INT3 group scales (ScaleInt3Function) and full block-FP8 dense weights (QAT), PLE INT5, W3A16 experts.",
+   "entry_points": [
+    "work/qwen38fn_qad/probes/student_traj_1022/train/qadmix_chain.sh",
+    "work/qwen38fn_qad/train_qad.sh",
+    "work/qwen38fn_qad/train_qad.py",
+    "work/qwen38fn_qad/int3_scale_qat.py",
+    "work/qwen38fn_qad/dense_full_qat.py",
+    "work/qwen38fn_qad/scale_grad_triton.py",
+    "work/qwen38fn_qad/topk_tail_kl.py",
+    "work/qwen38fn_lora/train_tito_mm.py"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "GPUS=0,1,2,3 OUT=$T/R MASTER_PORT=29661 bash work/qwen38fn_qad/train_qad.sh --mode train --model $M/gean320-int3-bf16dense --dense-qat-reference $M/gean320-int3-gptq --data $S/qadmix-1019-1022 --targets $S/teacher-qadmix/targets --bin-tokens 120000 --ple-codec int5 --int3-act bf16 --dense-qat-gemm cutlass --fast-kernels hc,hc_inject,gdn_norm,act_quant,qsa_select,qsa_dkdv,gdn_gva,qsa_union --offload-keep-gib 8 --steps 1000 --lr-schedule cosine --lr-min-ratio 0.01 --warmup-steps 30 --eval-every 50 --save-every 50 --keep-checkpoints 1 --export-every 1000 --kl reverse --store $ARC_RAM_RUNS/qwen38fn_qad/qadmix-R-store --wandb-name qad-qadmix-R-cos1000",
+     "source": "work/qwen38fn_qad/probes/student_traj_1022/train/qadmix_chain.sh:18-28"
+    }
+   ],
+   "inputs": [
+    "B1 gean320-int3-bf16dense",
+    "A5 gean320-int3-gptq (dense QAT reference)",
+    "B3 qadmix-1019-1022",
+    "B4 targets"
+   ],
+   "outputs": [
+    "$ARC_RAM_RUNS/qwen38fn_qad/qadmix-R-store/export/v001000 (delta export)",
+    "wandb project arc-qwen-qad"
+   ],
+   "run_records": "run_records/B5/ -- launch/chain.sh (unit qad-qadmix-chain: the R and F train_qad.sh command lines); config/ R's resolved config.json and plan.json",
+   "gaps": []
+  },
+  {
+   "step": "B6",
+   "purpose": "Materialize QAD R as a servable package (delta + A5 package, 708 tensors replaced) and build its BF16-dense twin for the RL trainers.",
+   "entry_points": [
+    "work/qwen38fn_qad/probes/student_traj_1022/train/materialize.sh",
+    "work/qwen38fn_qad/materialize_package.py",
+    "work/qwen38fn_qad/build_qad_bf16dense.py"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "python work/qwen38fn_qad/materialize_package.py --source $M/gean320-int3-gptq --delta $ARC_RAM_RUNS/qwen38fn_qad/qadmix-R-store/export/v001000 --out $M/qadmix-R-v1000",
+     "source": "work/qwen38fn_qad/probes/student_traj_1022/train/materialize.sh:8-9"
+    },
+    {
+     "cmd": "python build_qad_bf16dense.py --bf16dense <gEAN320 bf16dense> --package <materialized QAD package> ...",
+     "source": "work/qwen38fn_qad/build_qad_bf16dense.py:23"
+    }
+   ],
+   "inputs": [
+    "B5 export v001000",
+    "A5 package",
+    "B1 bf16dense"
+   ],
+   "outputs": [
+    "Kaggle model threerabbits/qwen38fn-gean320-int3-gptq/Transformers/default/3 = QAD R (deploy_manifest sha256 92b231d0; docs/research/qwen38fn_qad_student_traj_20261023.md:130)",
+    "/dev/shm/uid-$UID/models/qwen38fn-qadmix-R-int3-{gptq,bf16dense} (= qwen38fn-qadR1000-int3-{gptq,bf16dense}; RL starting weights)"
+   ],
+   "run_records": "run_records/B6/ -- launch/materialize.sh, upload_par.sh and upload_version_parallel.py (Kaggle model v3 upload)",
+   "gaps": [
+    "The upload command of Kaggle model v3 is not in git."
+   ]
+  },
+  {
+   "step": "C1",
+   "purpose": "Build the ARC-AGI-2 RL r4 task pool: 60 random eval120fix + 30 random audited true_hard tasks (seed 20261029), ambiguous tasks excluded by written per-task audits.",
+   "entry_points": [
+    "work/qwen38fn_rl/probes/arc2_ctx64k_20261029/build_pool.py",
+    "work/arc_code/arc2/eval120fix/build.py"
+   ],
+   "configs": [
+    "work/qwen38fn_rl/probes/arc2_ctx64k_20261029/audit549/audit_549.csv",
+    "work/arc_code/arc2/eval120fix/alternates.json",
+    "work/arc_code/arc2/eval120fix/fixes.json"
+   ],
+   "commands": [
+    {
+     "cmd": "python work/arc_code/arc2/eval120fix/build.py [--src <evaluation dir>] [--out <out dir>]",
+     "source": "work/arc_code/arc2/eval120fix/build.py:3"
+    },
+    {
+     "cmd": "build_pool.py <out_dir>   # out_dir = $ARC_DATA/arc2_pools/ctx64k90v2-20261029",
+     "source": "work/qwen38fn_rl/probes/arc2_ctx64k_20261029/build_pool.py:3; README.md:9"
+    }
+   ],
+   "inputs": [
+    "ARC-AGI-2 public evaluation 120",
+    "$ARC_DATA/arc2_pools/truehard558-20261028 (true_hard list work/seed_bank/results/synthcheck_20261027/true_hard.csv, not staged)"
+   ],
+   "outputs": [
+    "$ARC_DATA/arc2_pools/ctx64k90v2-20261029/ + .train.txt + .selection.json + .untrained_eval120fix.txt"
+   ],
+   "run_records": "run_records/C1/ -- code/ (true_hard.py and the audit builders of $ARC_RUNS/arc2_synthcheck/scripts); lists/ ctx64k90v2-20261029 selection / train / held-out lists and the truehard558-20261028 lists",
+   "gaps": [
+    "true_hard.py (run_records/C1/code/) writes true_hard.csv; the step from true_hard.csv to the truehard558-20261028 task directory and lists is not recorded.",
+    "ctx64k90v2-20261029.untrained_eval120fix.txt (RL_HELDOUT_IDS) has no builder in git."
+   ]
+  },
+  {
+   "step": "C2",
+   "purpose": "ARC-AGI-2 RL r4 (node1): LoRA Dr.GRPO + MIS [0.2,5] from QAD R, 24 groups x 24 episodes per step, binary all-tests reward, 40k output / 64k context harness (v3y + arc_v10 helper), W3A16 replicas + DFlash K4 on GPUs 0-2, 3-rank trainer on 3-5; stopped at v36, v30 delivered.",
+   "entry_points": [
+    "work/qwen38fn_rl/launch_arc2_largegrid_int3qat.sh",
+    "work/qwen38fn_rl/launch_b200_stream.sh",
+    "work/qwen38fn_rl/configure_b200.py",
+    "work/qwen38fn_rl/orchestrator.py",
+    "work/qwen38fn_lora/train_rl_service.py",
+    "work/qwen38fn_lora/prepare_rl.py",
+    "work/arc_code/arc2/run_arc2.py"
+   ],
+   "configs": [
+    "work/qwen38fn_rl/probes/arc2_ctx64k_20261029/env/arc2-r4.env",
+    "work/qwen38fn_rl/configs/arc2-ctx64k-tp1x3-int3qat.json",
+    "work/qwen38fn_rl/configs/harness-b40k-c64k-v3y-alltests-group.json",
+    "work/arc_code/arc2/prompts/v3y/",
+    "work/arc_code/arc2/arc_v10.py",
+    "deploy/sglang.lock.json"
+   ],
+   "commands": [
+    {
+     "cmd": "| `env/arc2-r4.env` | launcher environment (`source` it, then run `launch_arc2_largegrid_int3qat.sh`) |",
+     "source": "work/qwen38fn_rl/probes/arc2_ctx64k_20261029/README.md:11",
+     "values": "i.e. source the env file, then bash work/qwen38fn_rl/launch_arc2_largegrid_int3qat.sh"
+    },
+    {
+     "cmd": "RL_RUN=$ARC_RUNS/qwen38fn_rl/<YYYYMMDD>-arc2lg-... RL_TRAIN_IDS=<list> bash work/qwen38fn_rl/launch_arc2_largegrid_int3qat.sh",
+     "source": "work/qwen38fn_rl/launch_arc2_largegrid_int3qat.sh:47"
+    }
+   ],
+   "inputs": [
+    "B6 qwen38fn-qadmix-R-int3-gptq (serve) and -bf16dense (trainer)",
+    "C1 pool",
+    "E6 drafter $ARC_RUNS/qwen38fn_rl/dflash-rollout/drafter/planb-l8-s25562/deploy-fp8",
+    "agent runtime $ARC_RUNS/arc_code/agent-runtime-scipy",
+    "Humming 0.1.18 overlay $ARC_DATA/humming-overlays/0.1.18"
+   ],
+   "outputs": [
+    "NFS rl-archive/20261029-arc2r4-ctx64k90v2-qadR-tp1x3-b40k-c64k-alltests-g24b576-lr1e-4/trainer/{checkpoint-1..36, merged/v000005..v000036} (docs/research/arc2_rl_r4_ctx64k_20261029.md:65-68)",
+    "wandb 06zigul1"
+   ],
+   "run_records": "run_records/C2/ -- launch/rl-arc2r4-*.journal.txt (the final launch is 2026-10-28 22:11:24 UTC) and r4-start.txt (resolved config, fork lock, serve profile, drafter); config/ config.json, plan.json, harness-train / harness-eval json, trainer-config.json; lists/; code/ (the trainer files that differ from work/qwen38fn_lora, as run)",
+   "gaps": [
+    "Rollout server fork tree $HOME/work/sglang-arc-2-topp (lock target b200-rl-topp-1024, serve profile perf-main-fp16-ser-opt-lazyfix-l8-a16-topp) is not in this tree.",
+    "The run's config.json / plan.json are in the run directory, not in git.",
+    "Code ran from main around 19aba7293 / d2fdda9fd (10-28/29); the staged files are origin/main dc8cccf40."
+   ]
+  },
+  {
+   "step": "C3",
+   "purpose": "Turn r4 merged/v000030 into the Kaggle weight patch (516 changed tensors, 3.35 GB) applied on QAD R.",
+   "entry_points": [
+    "work/qwen38fn_rl/rl_overlay_package.py",
+    "work/qwen38fn_rl/rl_weight_patch.py"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "python rl_overlay_package.py --source <package> --source-manifest-sha256 <sha> --merged <trainer/merged/v000030> --out <dir>",
+     "source": "work/qwen38fn_rl/rl_overlay_package.py:14-15"
+    },
+    {
+     "cmd": "python rl_weight_patch.py --base <package> --overlay <overlay> --out <dir>",
+     "source": "work/qwen38fn_rl/rl_weight_patch.py:16"
+    }
+   ],
+   "inputs": [
+    "C2 trainer/merged/v000030",
+    "B6 QAD R package (deploy_manifest 92b231d0)"
+   ],
+   "outputs": [
+    "Kaggle model threerabbits/qwen38fn-int3-arc2r4-v30-patch/Transformers/default/1 (used by AGI-2 final 57848658)"
+   ],
+   "run_records": "run_records/C3/ -- config/overlay.json, patch.json and the Kaggle model metadata; launch/upload.sh (Kaggle model create); the rl_overlay_package.py / rl_weight_patch.py command lines were not recorded",
+   "gaps": [
+    "The exact invocation and upload for the v30 patch are not in git."
+   ]
+  },
+  {
+   "step": "D1",
+   "purpose": "Collect gen-2 level seeds (workspace snapshots at level changes) for ARC-AGI-3 public games, evaluate them, and keep the clean note_done seeds.",
+   "entry_points": [
+    "work/arc_code/gen2/seed_collect/collect.py",
+    "work/arc_code/gen2/seed_collect/seeds.py",
+    "work/arc_code/gen2/seed_collect/evaluate.py",
+    "work/arc_code/gen2/seed_collect/clean_seeds.py",
+    "work/arc_code/gen2/seed_collect/pick_eval2.py",
+    "work/arc_code/duckx/launch_codex.sh",
+    "work/arc_code/run_arm.py",
+    "src/arcforge/arc_code/seed_snapshot.py"
+   ],
+   "configs": [
+    "work/arc_code/duckx/configs/g2seed-t07.json",
+    "work/arc_code/duckx/configs/g2seed-t10.json",
+    "work/arc_code/duckx/configs/g2eval-t10.json",
+    "work/arc_code/prompts/g2b/"
+   ],
+   "commands": [
+    {
+     "cmd": "bash -c 'source env/env.sh && exec .venv/bin/python work/arc_code/gen2/seed_collect/collect.py --root ... --worktree ... --commit ...'",
+     "source": "work/arc_code/gen2/seed_collect/collect.py:49"
+    },
+    {
+     "cmd": "bash -c 'source env/env.sh && exec .venv/bin/python work/arc_code/gen2/seed_collect/evaluate.py --root ... ",
+     "source": "work/arc_code/gen2/seed_collect/evaluate.py:30"
+    },
+    {
+     "cmd": "python clean_seeds.py <seed store> <extracted note_gate dir> <out jsonl>",
+     "source": "work/arc_code/gen2/seed_collect/clean_seeds.py:9"
+    }
+   ],
+   "inputs": [
+    "ARC-AGI-3 public 25 games (official arc_agi / arcengine in the arm venv)",
+    "QAD R served (serve_qadr.sh)"
+   ],
+   "outputs": [
+    "seed store $ARC_DATA/arc3_seeds/g2seed-20261021 and NFS $ARC_NFS/arc3_seeds/g2seed-20261021 (store/bNNNN.tar.zst + index/bNNNN.jsonl; docs/research/arc3_g2seed_collection_difficulty_20261023.md:228)",
+    "work/arc_code/gen2/seed_collect/results/clean_seeds_eval_20261026.jsonl (staged: input of D2)"
+   ],
+   "gaps": [
+    "Seed store contents are data (not in git)."
+   ]
+  },
+  {
+   "step": "D2",
+   "purpose": "Build the RL v8 seed set g2seed-v8-20261029: 18 games, 235 ids (per level per epoch hard 5 / wall 3 / medium 2), classes from v7 (5 games) and from clean-seed 100k pass rates (15 games).",
+   "entry_points": [
+    "work/qwen38fn_rl/probes/arc3v8_20261029/seeds/build_v8_dir.py",
+    "work/qwen38fn_rl/probes/arc3v7_20261028/seeds/build_v7_dir.py",
+    "work/qwen38fn_rl/probes/arc3v7_20261028/seeds/extract_new_levels.py",
+    "work/arc_code/arc3_levels.py",
+    "src/arcforge/arc_code/level_seed.py"
+   ],
+   "configs": [
+    "work/qwen38fn_rl/probes/arc3v7_20261028/seeds/lists/",
+    "work/qwen38fn_rl/probes/arc3v7_20261028/seeds/selection.jsonl",
+    "work/qwen38fn_rl/probes/arc3v7_20261028/seeds/level_class.json",
+    "work/arc_code/gen2/seed_collect/results/clean_seeds_eval_20261026.jsonl"
+   ],
+   "commands": [
+    {
+     "cmd": "python3 build_v7_dir.py <repo> <v6b dir> <new stubs dir> <classes txt> <out dir>",
+     "source": "work/qwen38fn_rl/probes/arc3v7_20261028/seeds/build_v7_dir.py:12"
+    },
+    {
+     "cmd": "python3 extract_new_levels.py <repo> <out dir> <broken ws dir>",
+     "source": "work/qwen38fn_rl/probes/arc3v7_20261028/seeds/extract_new_levels.py:9"
+    },
+    {
+     "cmd": "python3 build_v8_dir.py <repo> <out dir>   # docstring line reads build_v7b_dir.py; out = $ARC_DATA/arc3_levels/g2seed-v8-20261029",
+     "source": "work/qwen38fn_rl/probes/arc3v8_20261029/seeds/build_v8_dir.py:23; work/qwen38fn_rl/probes/arc3v8_20261029/README.md:9"
+    }
+   ],
+   "inputs": [
+    "D1 seed store and clean seeds",
+    "$ARC_DATA/arc3_levels/g2seed-v7-20261028 (stubs and lists/classes.json of the 5 v7 games)"
+   ],
+   "outputs": [
+    "$ARC_DATA/arc3_levels/g2seed-v8-20261029"
+   ],
+   "run_records": "run_records/D2/ -- lists/ g2seed-v8-20261029 train / heldout / classes",
+   "gaps": [
+    "g2seed-v7-20261028 is built from the v6b seed dir (g2seed-v6b-20261027) whose construction scripts are not in the staged tree (v6/v6b seed sets derive from earlier RL rounds)."
+   ]
+  },
+  {
+   "step": "D3",
+   "purpose": "ARC-AGI-3 RL v8 (node2): dense full fine-tune (372 projections, FP32 master, FSDP2, lr 3e-6) from QAD R; each episode runs from a level seed to its first window change; reward = clear_reward on a clear, otherwise min(judge tier, clear_reward at the action count) from a group-wise codex gpt-6-astra note judge; 16 x 16 episodes per step; paused at v20.",
+   "entry_points": [
+    "work/qwen38fn_rl/probes/arc3v8_20261029/launch-v8.sh",
+    "work/qwen38fn_rl/probes/arc3v8_20261029/apply-v8-config.py",
+    "work/qwen38fn_rl/launch_arc3_round2_int3qat.sh",
+    "work/qwen38fn_rl/launch_b200_stream.sh",
+    "work/qwen38fn_rl/configure_b200.py",
+    "work/qwen38fn_rl/orchestrator.py",
+    "work/qwen38fn_rl/arc3_note_judge.py",
+    "src/arcforge/arc3_note.py",
+    "work/qwen38fn_lora/train_rl_service.py",
+    "work/qwen38fn_lora/dense_full_rl.py",
+    "work/qwen38fn_lora/prepare_rl.py",
+    "work/arc_code/run_arc3_level.py",
+    "work/arc_code/run_arm.py",
+    "work/arc_code/gen2/hooks/",
+    "work/arc_code/gen2/toolkit/tk5/"
+   ],
+   "configs": [
+    "work/qwen38fn_rl/probes/arc3v8_20261029/v8.env",
+    "work/qwen38fn_rl/configs/arc3-g2seed-v7.json",
+    "work/qwen38fn_rl/configs/harness-arc3-g2seed-v7.json",
+    "work/arc_code/configs/b200-g2seed-rl-v7.json",
+    "work/arc_code/prompts/g2tk5l/",
+    "work/arc_agi3/public_rules/en/"
+   ],
+   "commands": [
+    {
+     "cmd": "# ARC3 RL v8 (v8.env).   bash launch-v8.sh configure|start   (RL_DRY_RUN=1 prints, starts nothing)",
+     "source": "work/qwen38fn_rl/probes/arc3v8_20261029/launch-v8.sh:2",
+     "values": "required env per README.md:8: RL_JUDGE_BACKEND, RL_JUDGE_MODEL, RL_JUDGE_EFFORT, RL_RUN_DATE; the run used codex / gpt-6-astra / medium (docs/research/arc3_rl_v8_window_note_judge_20261030.md:47) and date 20261030 (ibid.:54)"
+    },
+    {
+     "cmd": "python3 apply-v8-config.py <RL_RUN> <worktree with configure_b200.py> <train ids> [smoke]",
+     "source": "work/qwen38fn_rl/probes/arc3v8_20261029/apply-v8-config.py:5",
+     "values": "runs between launch-v8.sh configure and launch-v8.sh start (launch-v8.sh:3-5)"
+    }
+   ],
+   "inputs": [
+    "B6 qwen38fn-qadR1000-int3-gptq (serve) and -bf16dense (trainer)",
+    "D2 g2seed-v8-20261029",
+    "E6 drafter deploy-fp8 ($ARC_RUNS/qwen38fn_rl/dflash-rollout/drafter/planb-l8-s25562/deploy-fp8)",
+    "judge venv $ARC_DATA/venvs/arc3-judge, codex CLI with ~/.codex login"
+   ],
+   "outputs": [
+    "$ARC_RUNS/qwen38fn_rl/20261030-arc3v8-g2seed-18g-235t-hw-g16-b256-r4c64-fp8kv-win1-note-codex-fullft-lr3e-6-wu2-tk5l-topp95k20-promptmean-mis-qadR-public25-contaminated (trainer/merged v5/v10/v15/v19/v20)",
+    "wandb qwen38fn-rl-arc3/0p1466gs"
+   ],
+   "run_records": "run_records/D3/ -- launch/rl-v8-*.journal.txt and v8-start.txt (head, fork lock, serve profile, drafter); config/ config.json, plan.json, harness json, trainer-config.json; lists/; code/ (the trainer files that differ from work/qwen38fn_lora, as run)",
+   "gaps": [
+    "Rollout fork tree $HOME/work/sglang-arc-2-topp at f9cf529b05a27878ff59b40a16b2f5477074dbc0 (launch-v8.sh check) is not in this tree.",
+    "The run used branch arc3-v8 (launch-v8.sh:6) plus fixes 6e65128a3, 3bb27fd8a, 489e0a738, 337d0bfc8; the staged files are origin/main dc8cccf40, which also contains the later v8b judge code (ensemble path, unused by v8).",
+    "codex judge binary and login are external."
+   ]
+  },
+  {
+   "step": "D4",
+   "purpose": "Ship v8@20 as a Kaggle weight delta (516 tensors in one model.safetensors) swapped in at run time by the AGI-3 notebook.",
+   "entry_points": [
+    "work/qwen38fn_lora/merged_export.py"
+   ],
+   "configs": [],
+   "commands": [],
+   "inputs": [
+    "D3 trainer/merged/v20"
+   ],
+   "outputs": [
+    "Kaggle model threerabbits/qwen38fn-int3-arc3v8-v20-delta/Transformers/default/1 (model.safetensors sha256 ffa67409...; used by AGI-3 final 57846476)"
+   ],
+   "run_records": "run_records/D4/ -- config/merged_manifest.json of the step-20 export; the Kaggle upload command for the delta was not found",
+   "gaps": [
+    "The command that produced the delta from merged/v20 and its upload are not recorded in git."
+   ]
+  },
+  {
+   "step": "E1",
+   "purpose": "Build the D-line drafter init from the official MTP: collect MTP MoE input rows on served drafts, fit dense10240 FFNs, build the M-T35-T39-T43-T47 dense draft, convert it to the 5-layer D-line init (mask_gr none).",
+   "entry_points": [
+    "work/qwen38fn_dflash/probes/native_mtp_dense/arms.sh",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/run_arm.sh",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/serve.sh",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/patch/mtpd_runtime.py",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/make_prompts.py",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/fit_dense.py",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/build_drafts.py",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/make_dline_init.py",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/width_sweep.sh",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/dline_sweep.sh",
+    "work/qwen38fn_dflash/init_mtp3.py"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "width_sweep.sh <spec> <experts...>",
+     "source": "docs/research/qwen38fn_native_mtp_dline_init_int3_20261012.md:118"
+    },
+    {
+     "cmd": "make_dline_init.py --draft <dense draft> --init ... --deploy ... [--mask-gr none]",
+     "source": "docs/research/qwen38fn_native_mtp_dline_init_int3_20261012.md:119"
+    },
+    {
+     "cmd": "run_dline.sh <name>",
+     "source": "docs/research/qwen38fn_native_mtp_dline_init_int3_20261012.md:120"
+    }
+   ],
+   "inputs": [
+    "Qwen3.8-Flash-Next-FP8 (MTP, embed, head)",
+    "A5 INT3 package (target)",
+    "A2 MTP mask (inputs/mtp320.pt)"
+   ],
+   "outputs": [
+    "$ARC_NFS/runs/qwen38fn_mtp_dense/20261011-int3-target47/dline/M_T35_T39_T43_T47-m70-none-init (docs/plans/qwen38fn_dline_nmtp_int3_training.md:24)"
+   ],
+   "gaps": []
+  },
+  {
+   "step": "E2",
+   "purpose": "Build DFlash data plans (capture jobs over TITO ledgers and parquet corpora) and the per-machine INT3 target profile.",
+   "entry_points": [
+    "work/qwen38fn_dflash/make_data_plan.py",
+    "work/qwen38fn_dflash/data_plan.py",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/build_dline_int3_plan.sh",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/stage_dline_int3_sources.sh",
+    "work/qwen38fn_dflash/probes/record_int3_profile.sh"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "OUT=$ARC_RUNS/qwen38fn_dflash/<date>-int3-target-profile MODEL=<INT3 package> GPU=<free gpu> INT3_FORK=$F bash work/qwen38fn_dflash/probes/record_int3_profile.sh",
+     "source": "docs/plans/qwen38fn_dline_nmtp_int3_training.md:51-52"
+    },
+    {
+     "cmd": "SRC=<dir> bash stage_dline_int3_sources.sh",
+     "source": "docs/plans/qwen38fn_dline_nmtp_int3_training.md:56"
+    },
+    {
+     "cmd": "SRC=... PROFILE=... OUT=$ARC_RUNS/qwen38fn_dflash/<date>-int3-plan bash build_dline_int3_plan.sh   # SMALL=1 for the resume-check plan",
+     "source": "docs/plans/qwen38fn_dline_nmtp_int3_training.md:58-59"
+    },
+    {
+     "cmd": "make_data_plan.py --codex1015 ...   # full argv in plan_meta.json",
+     "source": "docs/plans/qwen38fn_dline_ext_codex1015_20261017.md:28-29"
+    },
+    {
+     "cmd": "make_data_plan.py ... --int3c1019 --bench --heldout-from <old plan>",
+     "source": "docs/plans/dflash_l8_expand_20261020.md:34"
+    },
+    {
+     "cmd": "python make_data_plan.py --out <new dir> --target-profile <profile.json> --seed 0 --node1 <ledger instance dir> ... --agentic <parquet dir> --naive <parquet dir> --nemotron <tokens dir> ...",
+     "source": "work/qwen38fn_dflash/make_data_plan.py:3-6"
+    }
+   ],
+   "inputs": [
+    "$ARC_NFS/data/agentic_nvarc_segments (F4)",
+    "$ARC_NFS/runs/qwen38fn_distill/out.tar.zst (F3)",
+    "$ARC_NFS/runs/qwen38fn_specdata/<batch>/tokens.tar.zst (F2)",
+    "$ARC_NFS/runs/tito/20261006-node1-collect/ledger/<instance>/ (A1)",
+    "codex1015 ledgers (F1), 1019 INT3 ledgers, bench base+PLE ledgers (eval120, independent1000 360, public-25)"
+   ],
+   "outputs": [
+    "D-line plan (plan.jsonl sha256 1936536320...)",
+    "$ARC_RUNS/qwen38fn_dflash/20261017-codex1015-plan (c8e1608e...)",
+    "$ARC_RUNS/qwen38fn_dflash/20261020-l8-plan (2.248B train anchors)"
+   ],
+   "run_records": "run_records/E2/ -- config/ plan_meta.json (make_data_plan.py argv, including the ledger instances) + summary.json of each data plan, and the 10-12 / 10-17 target profiles",
+   "gaps": [
+    "The exact argv of each plan is in its plan_meta.json, copied to run_records/E2/config/.",
+    "The bench ledgers that fed --bench are listed in the argv of run_records/E2/config/l8-plan.plan_meta.json."
+   ]
+  },
+  {
+   "step": "E3",
+   "purpose": "Train the D-line drafter on INT3 W3A8 captures (34,404 steps, prefix gate v3, WSD), then extend on codex1015 data (warm start, 9,425 steps).",
+   "entry_points": [
+    "work/qwen38fn_dflash/probes/native_mtp_dense/launch_dline_int3.sh",
+    "work/qwen38fn_dflash/pipeline.sh",
+    "work/qwen38fn_dflash/train.py",
+    "work/qwen38fn_dflash/fast_train.py",
+    "work/qwen38fn_dflash/prefix_gate.py",
+    "work/qwen38fn_dflash/pool.py",
+    "work/qwen38fn_dflash/capture_tito.py",
+    "work/qwen38fn_dflash/fast_gates.py",
+    "work/qwen38fn_dflash/probes/pool_resume_check.sh",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/keep_predecay.sh"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "TAG=<date>-resume-check-int3 PLAN=<small plan> INIT=<init> CAPTURE_GPUS=... TRAINER_GPUS=... ARC_SGLANG_FORK=$F LOCK_TARGET=b200-rl-int3 PYTHON=... TORCHRUN=... PREFIX_GATE_ALPHA=0.01 PREFIX_GATE_TEMPERATURE=0.7 LR_SCHEDULE=wsd LR_DECAY_FRACTION=0.2 COV_WEIGHT=0.3 COV_WEIGHT_FINAL=0.05 REDUCER_LR=3e-5 bash work/qwen38fn_dflash/probes/pool_resume_check.sh",
+     "source": "docs/plans/qwen38fn_dline_nmtp_int3_training.md:72-76"
+    },
+    {
+     "cmd": "CUDA_VISIBLE_DEVICES=<gpu> $PYTHON work/qwen38fn_dflash/fast_gates.py --features <held-out job dir> --resume-evidence <resume-evidence.json> --objective acceptance --out $ARC_RUNS/qwen38fn_dflash/<date>-fast-gate-int3/gate-acceptance.json",
+     "source": "docs/plans/qwen38fn_dline_nmtp_int3_training.md:84-86"
+    },
+    {
+     "cmd": "TAG=... PLAN=... GATE=... CAPTURE_GPUS=... TRAINER_GPUS=... bash launch_dline_int3.sh",
+     "source": "docs/plans/qwen38fn_dline_nmtp_int3_training.md:91"
+    },
+    {
+     "cmd": "TAG=20261017-dline-ext-codex1015 PLAN=<plan> GATE=<gate report> CAPTURE_GPUS=2,3 TRAINER_GPUS=0,1 LR_SCALE=1 COV_WEIGHT=0.05 COV_WEIGHT_FINAL=0.05 LR_DECAY_FRACTION=0.3 WARM_START=<parent checkpoint dir> WARM_NEW_DATA=1 REWARM_STEPS=500 BASE_PORT=30801 bash work/qwen38fn_dflash/probes/native_mtp_dense/launch_dline_int3.sh",
+     "source": "docs/plans/qwen38fn_dline_ext_codex1015_20261017.md:46-49"
+    }
+   ],
+   "inputs": [
+    "E1 init",
+    "E2 plans",
+    "A5 INT3 package as capture target (fork exp/rl-int3 4f040c4e3, lock b200-rl-int3)"
+   ],
+   "outputs": [
+    "D-line v3wsd step 34404 (docs/research/qwen38fn_dline_v3wsd_int3_20261015.md)",
+    "ext codex1015 step 9425 ($ARC_NFS/runs/qwen38fn_dflash/)"
+   ],
+   "run_records": "run_records/E3/ -- launch/dline-ext-codex1015.autoresume.sh (+ unit, resume-start and pipeline-start lines); config/ 20261013-dline-nmtp-int3-v3wsd launch.json, run-config and step-34404 manifest, the resume-check configs, the pre-decay manifest",
+   "gaps": [
+    "Capture fork trees (exp/rl-int3 4f040c4e3, exp/dline-maskgr b326389e4) are not in this tree.",
+    "The 9425 run's auto-resume script ($ARC_RUNS/qwen38fn_dflash/20261017-dline-ext-codex1015.autoresume.sh) is not in git."
+   ]
+  },
+  {
+   "step": "E4",
+   "purpose": "Plan B: convert the HC 9425 drafter to plain residual + target-KV injection (dense FFN 10880) and train one pass on codex1015 (8,251 steps).",
+   "entry_points": [
+    "work/qwen38fn_dflash/convert_plain.py",
+    "work/qwen38fn_dflash/export_trained.py",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/launch_dline_int3.sh"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "python convert_plain.py --source <trained-bf16-export> --features <job dir> [<job dir> ...] --out <dir> [--context inject|recompute] [--max-tokens 24576] [--anchors-per-job 256]",
+     "source": "work/qwen38fn_dflash/convert_plain.py:5-6"
+    },
+    {
+     "cmd": "python work/qwen38fn_dflash/export_trained.py --checkpoint $ARC_RUNS/qwen38fn_dflash/<run>/trainer/step-NNNNNNNNN --out <new dir>",
+     "source": "work/qwen38fn_dflash/export_trained.py:8-9"
+    }
+   ],
+   "inputs": [
+    "E3 9425 export",
+    "codex1015 plan and features"
+   ],
+   "outputs": [
+    "$ARC_RUNS/qwen38fn_dflash/20261019-plain-convert/ (inject init)",
+    "$ARC_RUNS/qwen38fn_dflash/20261019-plain-inject-codex1015/trainer/step-000008251 (docs/research/qwen38fn_dflash_plain_inject_20261019.md:90-95)"
+   ],
+   "run_records": "run_records/E4/ -- launch/plain-inject-codex1015.launch.sh (+ unit) and the two resume-check launchers; config/ launch.json, trainer run-config, step9425-plain-inject config and initialization_manifest.json",
+   "gaps": [
+    "The plan B run's .launch.sh / .watch.sh are in the run directory, not in git (docs/research/qwen38fn_dflash_plain_inject_20261019.md:95)."
+   ]
+  },
+  {
+   "step": "E5",
+   "purpose": "Deepen plan B 5 -> 8 layers (order 0,1,2,3,1,2,3,4, copied, not zeroed) and continue training on 2.248B anchors (codex1015 + 1019 INT3 + bench base/PLE + node1 10-06) for 25,562 steps.",
+   "entry_points": [
+    "work/qwen38fn_dflash/expand_layers.py",
+    "work/qwen38fn_dflash/probes/native_mtp_dense/launch_dline_int3.sh",
+    "work/qwen38fn_dflash/pipeline.sh"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "python expand_layers.py --source <drafter in the init layout> --order 0,1,2,3,1,2,3,4 --zero-repeats --out <dir>   # the used init step8251-L8-copy omits --zero-repeats",
+     "source": "work/qwen38fn_dflash/expand_layers.py:4; docs/plans/dflash_l8_expand_20261020.md:15-20"
+    },
+    {
+     "cmd": "LR_SCALE 1, wsd with decay over the last 30%, coverage fixed at 0.05, prefix gate v3 (α 0.01, T 0.7), STEP_ANCHORS 89000, MICRO 4096, JOBS_PER_RANK 8. About 25k steps.",
+     "source": "docs/plans/dflash_l8_expand_20261020.md:42",
+     "values": "recipe of the L8 run (env of launch_dline_int3.sh); GPUs 0-5 = 3 trainer + 3 capture (ibid.:48)"
+    }
+   ],
+   "inputs": [
+    "E4 step 8251",
+    "E2 20261020-l8-plan"
+   ],
+   "outputs": [
+    "$ARC_NFS/runs/qwen38fn_dflash/20261020-l8-codexmix/trainer/ (step 8000-25562)"
+   ],
+   "run_records": "run_records/E5/ -- launch/l8-prep.sh and l8-codexmix.launch.sh (+ units; pipeline-start: trainer GPUs 0,1,2, capture GPUs 3,4,5); config/ resume-check configs, step8251-L8-copy config / initialization_manifest / SHA256SUMS, step-25562 manifest",
+   "gaps": [
+    "The L8 run's launch script (20261020-l8-codexmix .launch.sh) and checkpoint-archive unit script are in the run directory, not in git."
+   ]
+  },
+  {
+   "step": "E6",
+   "purpose": "Export step 25562 and convert it to the deploy formats (deploy-bf16 for B200, deploy-fp8 for G4/L4/Kaggle).",
+   "entry_points": [
+    "work/qwen38fn_dflash/export_trained.py",
+    "work/qwen38fn_dflash/make_dense_deploy.py",
+    "work/qwen38fn_dflash/convert_dense.py"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "1. export with `export_trained.py`, then convert to a BF16 deploy with `make_dense_deploy.py`;",
+     "source": "docs/plans/qwen38fn_dline_nmtp_int3_training.md:95",
+     "values": "G4/Kaggle use deploy-fp8 (make_dense_deploy.py default routed + attention), B200 uses deploy-bf16 (ibid.:98)"
+    },
+    {
+     "cmd": "python work/qwen38fn_dflash/make_dense_deploy.py --source <...-bf16> --out <...-deploy>",
+     "source": "work/qwen38fn_dflash/make_dense_deploy.py:9"
+    }
+   ],
+   "inputs": [
+    "E5 step-000025562"
+   ],
+   "outputs": [
+    "exports/step-000025562-{bf16,deploy-bf16,deploy-fp8} (NFS $ARC_NFS/runs/qwen38fn_dflash/20261020-l8-codexmix/exports/)",
+    "HF private ycchen/qwen38fn-dflash-planb-l8-s25562; Kaggle dataset threerabbits/qwen38fn-dflash-planb-l8-s25562-fp8 (docs/research/qwen38fn_dflash_l8_codexmix_20261021.md:70-73)"
+   ],
+   "gaps": []
+  },
+  {
+   "step": "F1",
+   "purpose": "Codex trace ledgers on node1 (FP8 + DFlash) (10-15, 'codex1015'): ARC-AGI-2 run_arc2_seq batches and ARC-AGI-3 arms with top-32 ledgers; moved to NFS with O_DIRECT.",
+   "entry_points": [
+    "work/tito/collect/run_20261015/arc2/feeder.py",
+    "work/tito/collect/run_20261015/arc2/run_batch.sh",
+    "work/tito/collect/run_20261015/arc3/feeder.py",
+    "work/tito/collect/run_20261015/arc3_stopgap/launch_arm2.sh",
+    "work/tito/collect/run_20261015/gate/serve_gate2.sh",
+    "work/tito/collect/run_20261015/offload2.py",
+    "work/tito/collect/run_20261015/move_ledger_tk.sh",
+    "work/tito/collect/run_20261015/rebuild_manifests.py",
+    "work/tito/collect/nfs_move.py"
+   ],
+   "configs": [
+    "work/arc_code/arc2/configs/b200-fp8-collect-seq-wrap.json",
+    "work/tito/collect/run_20261015/arc3/corpora.json",
+    "work/tito/collect/run_20261015/arc3_stopgap/configs/"
+   ],
+   "commands": [
+    {
+     "cmd": "work/arc_code/arc2/run_arc2_seq.py --config work/arc_code/arc2/configs/b200-fp8-collect-seq-wrap.json --run-dir $ARC_RUNS/tito/20261015-fp8-dflash-collect/arc2/$3 --tasks-dir $ARC_DATA/arc2_pools/$1 --only $2 --pool-label $1 --agent-python $ARC_RUNS/arc_code/agent-runtime/bin/python --driver-bin $(dirname $ARC_CODEX_PREFIX)/arc2-jail --model-base-url http://127.0.0.1:$4/v1 --model qwen38fn --tokenizer-json $ARC_NFS/models/Qwen3.8-Flash-Next-FP8/tokenizer.json --concurrency $5 --arms ind,refine_exp,rerefine --solvers-first",
+     "source": "work/tito/collect/run_20261015/arc2/run_batch.sh:7-14"
+    }
+   ],
+   "inputs": [
+    "Qwen3.8-Flash-Next-FP8 + DFlash",
+    "ARC-AGI-2 pools, ARC-AGI-3 community corpora (corpora.json)"
+   ],
+   "outputs": [
+    "$ARC_RUNS/tito/20261015-fp8-dflash-collect/ ledgers (docs/research/tito_fp8_dflash_collect_20261015.md)"
+   ],
+   "run_records": "run_records/F1/ -- lists/arc2_batches.tsv (the 17 arc2 batches launched from the 2,099-batch queue)",
+   "gaps": [
+    "arc2/queue.json (2,099 batches) stays in the run directory (work/tito/collect/run_20261015/README.md).",
+    "Scripts are snapshots with node1 paths (README.md)."
+   ]
+  },
+  {
+   "step": "F2",
+   "purpose": "Nemotron-v2 prompts -> Qwen3.8-FN FP8 raw-token corpus (input_ids + loss_mask parquet), three batches (300,010 rows).",
+   "entry_points": [
+    "work/qwen38fn_specdata/generate.py",
+    "work/qwen38fn_specdata/serve.sh",
+    "work/qwen38fn_specdata/supervise.py",
+    "work/qwen38fn_specdata/preflight.py",
+    "work/qwen38fn_specdata/audit.py",
+    "work/qwen38fn_specdata/inventory.py",
+    "work/qwen38fn_specdata/finalize.py",
+    "work/qwen38fn_specdata/prepare_continuation.py",
+    "work/qwen38fn_eval/serve_qwen38fn.sh"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "$PYTHON work/qwen38fn_specdata/generate.py prepare --out $RUN --limit-per-split 22223 --exclude-runs $ARC_RUNS/qwen38fn_specdata/20260907-nemotron-100k-v1",
+     "source": "work/qwen38fn_specdata/RUNBOOK.md:14-15"
+    },
+    {
+     "cmd": "GPUS=0,1,2,3 PORT=30470 bash work/qwen38fn_specdata/serve.sh",
+     "source": "work/qwen38fn_specdata/RUNBOOK.md:16"
+    },
+    {
+     "cmd": "$PYTHON work/qwen38fn_specdata/generate.py generate --out $RUN --model $MODEL --server http://127.0.0.1:${PORT:-30471} --max-new-tokens 8192",
+     "source": "work/qwen38fn_specdata/RUNBOOK.md:18-20"
+    }
+   ],
+   "inputs": [
+    "Nemotron-v2 prompts (HF dataset; split list in generate.py)",
+    "Qwen3.8-Flash-Next-FP8"
+   ],
+   "outputs": [
+    "$ARC_RUNS/qwen38fn_specdata/{20260907-nemotron-100k-v1,20260908-nemotron-short4k-v1,20260908-nemotron-8k-v2}/tokens/part-*.parquet; NFS $ARC_NFS/runs/qwen38fn_specdata/<batch>/tokens.tar.zst"
+   ],
+   "gaps": []
+  },
+  {
+   "step": "F3",
+   "purpose": "Qwen3.8-FN FP8 as teacher on NVARC synthetic tasks (CoT:TIR 1:3, 40,960-token budget): token-level append-only distillation corpus.",
+   "entry_points": [
+    "work/qwen38fn_distill/rollout_runner.py",
+    "work/qwen38fn_distill/pack_menu.py",
+    "work/qwen38fn_distill/preflight.py",
+    "work/qwen38fn_distill/serve.sh",
+    "work/qwen38fn_distill/supervise.sh",
+    "work/qwen38fn_distill/watch.sh",
+    "work/qwen38fn_distill/verify_spans.py",
+    "work/qwen38fn_distill/relabel.py",
+    "work/qwen38fn_distill/summarize.py",
+    "work/qwen38fn_eval/prompt_packs.py"
+   ],
+   "configs": [
+    "src/arcforge/tir/tir_config.json"
+   ],
+   "commands": [
+    {
+     "cmd": "bash work/qwen38fn_distill/serve.sh 2>&1 | tee $ARC_RUNS/qwen38fn_distill/serve.log",
+     "source": "work/qwen38fn_distill/README.md:63"
+    },
+    {
+     "cmd": "$HOME/work/dsv4/venv-qwen4/bin/python work/qwen38fn_distill/preflight.py --tokenizer $ARC_MODELS/Qwen3.8-Flash-Next-FP8 --base-url http://127.0.0.1:30041",
+     "source": "work/qwen38fn_distill/README.md:64-65"
+    },
+    {
+     "cmd": "$HOME/work/dsv4/venv-qwen4/bin/python work/qwen38fn_distill/rollout_runner.py --corpus $HOME/work/dsv4/nvarc_distill/nvarc_training.jsonl.zst --out $ARC_RUNS/qwen38fn_distill/out --tokenizer $ARC_MODELS/Qwen3.8-Flash-Next-FP8 --base-url http://127.0.0.1:30041 --concurrency 200",
+     "source": "work/qwen38fn_distill/README.md:66-69"
+    }
+   ],
+   "inputs": [
+    "NVARC nvarc_training.jsonl.zst (47,337 tasks; $HOME/work/dsv4/nvarc_distill/)",
+    "Qwen3.8-Flash-Next-FP8"
+   ],
+   "outputs": [
+    "$ARC_RUNS/qwen38fn_distill/out; NFS $ARC_NFS/runs/qwen38fn_distill/out.tar.zst"
+   ],
+   "gaps": [
+    "NVARC corpora are external data (machine paths)."
+   ]
+  },
+  {
+   "step": "F4",
+   "purpose": "Agentic (compact v2 harness, 50k rolling context) distillation on all 103k NVARC tasks; every pre-compaction message list rendered to token parquet (agentic_nvarc_segments).",
+   "entry_points": [
+    "work/agentic_distill/run_shard.sh",
+    "work/agentic_distill/supervise.sh",
+    "work/agentic_distill/render_segments.py",
+    "work/agentic_distill/summarize.py",
+    "work/agentic_tir/agentic_tir.py",
+    "work/agentic_tir/token_backend.py",
+    "work/agentic_tir/prompts.py"
+   ],
+   "configs": [],
+   "commands": [
+    {
+     "cmd": "TAG=pilot SHARD=a PORT=30031 LIVE=96 TLIVE=48 bash work/agentic_distill/run_shard.sh",
+     "source": "work/agentic_distill/README.md:64"
+    },
+    {
+     "cmd": "LIVE=160 TLIVE=80 setsid nohup bash work/agentic_distill/supervise.sh > $ARC_RUNS/agentic_distill/supervisor.nohup 2>&1 < /dev/null &",
+     "source": "work/agentic_distill/README.md:66"
+    },
+    {
+     "cmd": "$HOME/work/dsv4/venv-qwen4/bin/python work/agentic_distill/render_segments.py --run $ARC_RUNS/agentic_distill/{train,mix}-{a,b} --corpus $HOME/work/dsv4/nvarc_distill/nvarc_training.jsonl.zst $ARC_DATA/nvarc_synthetic/nvarc_full.jsonl.zst --out $ARC_DATA/agentic_nvarc_segments --tokenizer $ARC_MODELS/Qwen3.8-Flash-Next-FP8 --workers 32",
+     "source": "work/agentic_distill/README.md:69-72"
+    }
+   ],
+   "inputs": [
+    "NVARC nvarc_training + nvarc_full corpora",
+    "task lists $ARC_RUNS/agentic_distill/lists/ (README.md:62)",
+    "Qwen3.8-Flash-Next-FP8"
+   ],
+   "outputs": [
+    "$ARC_DATA/agentic_nvarc_segments; NFS $ARC_NFS/data/agentic_nvarc_segments"
+   ],
+   "run_records": "run_records/F4/ -- launch/supervisor-starts.txt (supervisor, server and runner starts); lists/ train and mix task lists",
+   "gaps": [
+    "Task lists under $ARC_RUNS/agentic_distill/lists are not in git."
+   ]
+  },
+  {
+   "step": "F5",
+   "purpose": "ARC-AGI-2 task-pool pipeline code: training-seed validation (training1000 seeds), the largegrid30 RL pack (ARC-GEN regenerated at <=30x30), independent1000 and quality300 validators.",
+   "entry_points": [
+    "work/seed_bank/verify.py",
+    "work/seed_bank/tools/audit.py",
+    "work/seed_bank/tools/replay_training_semantics.py",
+    "work/seed_bank/tools/training_inventory.py",
+    "work/seed_bank/tools/stage_training_sources.py",
+    "work/seed_bank/tools/crosscheck_arcgen.py",
+    "work/seed_bank/tools/seed_quality.py",
+    "work/seed_bank/tools/build_largegrid_pack.py",
+    "work/seed_bank/tools/verify_synth.py",
+    "work/seed_bank/independent1000/validate_examples.py",
+    "work/seed_bank/quality300/tools/replay.py"
+   ],
+   "configs": [
+    "work/concept_extract/taxonomy.yaml"
+   ],
+   "commands": [
+    {
+     "cmd": ".venv/bin/python work/seed_bank/tools/audit.py --kind training --workers 5 --out $RUN/audit",
+     "source": "work/seed_bank/TRAINING.md:30"
+    },
+    {
+     "cmd": ".venv/bin/python work/seed_bank/tools/replay_training_semantics.py --workers 5 --out $RUN/semantics",
+     "source": "work/seed_bank/TRAINING.md:31"
+    },
+    {
+     "cmd": ".venv/bin/python work/seed_bank/tools/training_inventory.py --reports $RUN/audit --semantic-reports $RUN/semantics --out $RUN/inventory.json",
+     "source": "work/seed_bank/TRAINING.md:32-33"
+    },
+    {
+     "cmd": ".venv/bin/python work/seed_bank/tools/seed_quality.py $OUT --out work/seed_bank/results/training_seed_quality.json",
+     "source": "work/seed_bank/TRAINING.md:58"
+    },
+    {
+     "cmd": "python work/seed_bank/tools/build_largegrid_pack.py build --out $ARC_DATA/arc2_pools/largegrid30-20261022",
+     "source": "work/seed_bank/tools/build_largegrid_pack.py:19"
+    }
+   ],
+   "inputs": [
+    "ARC-AGI-2 @f3283f727488ad98fe575ea6a5ac981e4a188e49 ($ARC_DATA/ARC-AGI-2)",
+    "ARC-GEN @a15cbdb44c776610aeeb9f487a06af875d3d0878 ($ARC_DATA/ARC-GEN)",
+    "work/seed_bank/seeds/training/ and seeds/evaluation/ (per-task seeds; data, not staged)"
+   ],
+   "outputs": [
+    "$ARC_DATA/arc2_pools/largegrid30-20261022 (378 tasks)",
+    "work/seed_bank/results/training_seed_quality.json (not staged)"
+   ],
+   "gaps": [
+    "Generators that produced independent1000 and quality300 packages are documented in GENERATION.md / PIPELINE.md; the full quality300 pipeline (validate.py, accept.py) is not in git (quality300/PIPELINE.md).",
+    "Pools training1000 / nvarc_training / nvarc_full / synth108 are external or derived data with no builder in the staged tree."
+   ]
+  }
+ ],
+ "data_released_separately": [
+  "work/seed_bank/seeds/training/ (per-task seed packages, training 1,000)",
+  "work/seed_bank/seeds/evaluation/ (per-task seed packages, evaluation 120)",
+  "work/seed_bank/independent1000/packages/ (+ PACKAGE_INDEX.json, FILE_SHA256.json, DELIVERY_PARTS.json, REPLAY_SUMMARY.json, REVIEW_STATUS.json)",
+  "work/seed_bank/quality300/packages/ (+ FILE_SHA256.json, reports/, licenses/, tools/templates/)",
+  "work/seed_bank/synth/ (synth108 families)",
+  "work/seed_bank/results/synthcheck_20261027/true_hard.csv (true_hard list behind truehard558-20261028)",
+  "work/arc_code/gen2/seed_collect/results/ other than clean_seeds_eval_20261026.jsonl (evaluation summaries)",
+  "work/qwen38fn_rl/arc3_level_keys/ (v8b judge answer keys; unused by v8)"
+ ],
+ "external_dependencies": [
+  "sglang-arc-2 fork trees and lock targets named in deploy/sglang.lock.json (see stage/runtime for the export/pack scripts)",
+  "codex CLI builds and jail wrappers (stage/runtime holds the codex build + patches)",
+  "Python venvs: venv-fn-train (trainers), dsv4/venv-0520 (sglang 0.5.20), venv-qwen4, arc3-judge venv, agent runtimes; arc_agi / arcengine live in the arm venv",
+  "Humming kernels overlay 0.1.18 ($ARC_DATA/humming-overlays/0.1.18)",
+  "machine locations (ARC_DATA, ARC_MODELS, ARC_RUNS, ARC_RAM_RUNS, ARC_SGLANG_FORK, ARC_SGLANG_VENV, ARC_CODEX_PREFIX, ARC_AGENT_RUNTIME, ...): env/local.sh, created from env/local.sh.example; node1 and node2 set them in their own machine files"
+ ]
+}

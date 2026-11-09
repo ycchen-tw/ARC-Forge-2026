@@ -1,0 +1,453 @@
+From ab94b608df63c31bae2290512b612a8efc574541 Mon Sep 17 00:00:00 2001
+From: arc <a@b.c>
+Date: Sat, 19 Sep 2026 08:13:10 +0000
+Subject: [PATCH 4/7] arc: 0009-qwen4-mtp-distributed-topk1
+
+---
+ .../sglang/kernels/ops/speculative/topk1.py   | 162 ++++++++++++++++++
+ python/sglang/srt/environ.py                  |   3 +
+ python/sglang/srt/layers/logits_processor.py  |   5 +
+ .../runner/decode_cuda_graph_runner.py        |   4 +
+ .../runner/prefill_cuda_graph_runner.py       |   4 +
+ python/sglang/srt/models/qwen4_exp_mtp.py     |  36 +++-
+ .../eagle_draft_extend_cuda_graph_runner.py   |   4 +
+ .../sglang/srt/speculative/eagle_worker_v2.py |  81 +++++++--
+ 8 files changed, 279 insertions(+), 20 deletions(-)
+
+diff --git a/python/sglang/kernels/ops/speculative/topk1.py b/python/sglang/kernels/ops/speculative/topk1.py
+index 93f658f2..94afa27f 100644
+--- a/python/sglang/kernels/ops/speculative/topk1.py
++++ b/python/sglang/kernels/ops/speculative/topk1.py
+@@ -37,6 +37,67 @@ def _draft_topk1_partial_argmax_kernel(
+     tl.store(partial_indices + out_offset, split * BLOCK + local_index)
+ 
+ 
++@triton.jit
++def _draft_topk1_local_candidate_kernel(
++    partial_vals,
++    partial_indices,
++    candidates,
++    vocab_start,
++    num_splits: tl.constexpr,
++    BLOCK: tl.constexpr,
++):
++    row = tl.program_id(0)
++    offsets = tl.arange(0, BLOCK)
++    mask = offsets < num_splits
++    vals = tl.load(
++        partial_vals + row * num_splits + offsets,
++        mask=mask,
++        other=-float("inf"),
++    )
++    split = tl.argmax(vals, axis=0)
++    max_val = tl.load(partial_vals + row * num_splits + split)
++    local_index = tl.load(partial_indices + row * num_splits + split)
++    tl.store(candidates + row * 2, max_val)
++    # Global token ids are below 2^24, hence exactly representable in fp32.
++    tl.store(candidates + row * 2 + 1, (vocab_start + local_index).to(tl.float32))
++
++
++@triton.jit
++def _draft_topk1_global_finalize_kernel(
++    gathered_candidates,
++    topk_p,
++    topk_index,
++    positions,
++    draft_tokens,
++    draft_tokens_stride,
++    draft_token_column,
++    TP_SIZE: tl.constexpr,
++    WRITE_DRAFT_TOKEN: tl.constexpr,
++    ADVANCE_POSITIONS: tl.constexpr,
++    BLOCK: tl.constexpr,
++):
++    row = tl.program_id(0)
++    ranks = tl.arange(0, BLOCK)
++    mask = ranks < TP_SIZE
++    row_base = row * (2 * TP_SIZE)
++    vals = tl.load(
++        gathered_candidates + row_base + ranks * 2,
++        mask=mask,
++        other=-float("inf"),
++    )
++    # Rank order follows global vocab order, so tl.argmax's first tie matches
++    # argmax over the fully gathered logits.
++    winner = tl.argmax(vals, axis=0)
++    index = tl.load(gathered_candidates + row_base + winner * 2 + 1).to(tl.int64)
++    tl.store(topk_index + row, index)
++    tl.store(topk_p + row, 1.0)
++    if WRITE_DRAFT_TOKEN:
++        tl.store(draft_tokens + row * draft_tokens_stride + draft_token_column, index)
++    if ADVANCE_POSITIONS:
++        position = tl.load(positions + row)
++        tl.store(positions + row, position + 1)
++
++
+ @triton.jit
+ def _draft_topk1_finalize_kernel(
+     partial_vals,
+@@ -148,3 +209,104 @@ def draft_topk1_postprocess(
+         num_warps=1,
+     )
+     return topk_p, topk_index
++
++
++def draft_topk1_postprocess_distributed(
++    local_next_token_logits: torch.Tensor,
++    positions: torch.Tensor | None,
++    *,
++    vocab_start_index: int,
++    global_vocab_size: int,
++    draft_tokens: torch.Tensor | None = None,
++    draft_token_column: int = 0,
++):
++    """Exact global argmax from vocab-parallel draft logits.
++
++    Each rank reduces only its local vocabulary shard, all-gathers one
++    ``(max_logit, global_token_id)`` pair per row, then selects the winning
++    rank. This replaces the full ``[batch, vocab]`` all-gather used by greedy
++    top-1 MTP drafting. The candidate id is carried as fp32, which is exact for
++    all supported vocabulary sizes. If ``positions`` is ``None``, the helper
++    selects a token without advancing decode positions (draft-extend seeding).
++    """
++    from sglang.srt.distributed import tensor_model_parallel_all_gather
++
++    assert local_next_token_logits.ndim == 2
++    assert local_next_token_logits.stride(1) == 1
++    advance_positions = positions is not None
++    if advance_positions:
++        assert positions.ndim == 1 and positions.is_contiguous()
++        assert positions.shape[0] == local_next_token_logits.shape[0]
++        assert positions.device == local_next_token_logits.device
++    assert vocab_start_index >= 0
++    assert global_vocab_size > vocab_start_index
++    assert global_vocab_size < 1 << 24
++
++    write_draft_token = draft_tokens is not None
++    if write_draft_token:
++        assert draft_tokens.ndim == 2
++        assert draft_tokens.dtype == torch.long
++        assert draft_tokens.device == local_next_token_logits.device
++        assert draft_tokens.shape[0] == local_next_token_logits.shape[0]
++        assert draft_tokens.stride(1) == 1
++        assert 0 <= draft_token_column < draft_tokens.shape[1]
++
++    bs, local_width = local_next_token_logits.shape
++    valid_local_vocab = min(local_width, global_vocab_size - vocab_start_index)
++    assert valid_local_vocab > 0
++    topk_p = torch.empty(
++        (bs, 1), dtype=torch.float32, device=local_next_token_logits.device
++    )
++    topk_index = torch.empty(
++        (bs, 1), dtype=torch.int64, device=local_next_token_logits.device
++    )
++    if bs == 0:
++        return topk_p, topk_index
++
++    block = _DRAFT_TOPK1_BLOCK
++    num_splits = triton.cdiv(valid_local_vocab, block)
++    partial_vals = torch.empty(
++        (bs, num_splits), dtype=torch.float32, device=local_next_token_logits.device
++    )
++    partial_indices = torch.empty(
++        (bs, num_splits), dtype=torch.int32, device=local_next_token_logits.device
++    )
++    _draft_topk1_partial_argmax_kernel[(bs, num_splits)](
++        local_next_token_logits,
++        partial_vals,
++        partial_indices,
++        local_next_token_logits.stride(0),
++        valid_local_vocab,
++        num_splits,
++        BLOCK=block,
++        num_warps=8,
++    )
++    candidates = torch.empty(
++        (bs, 2), dtype=torch.float32, device=local_next_token_logits.device
++    )
++    _draft_topk1_local_candidate_kernel[(bs,)](
++        partial_vals,
++        partial_indices,
++        candidates,
++        vocab_start_index,
++        num_splits,
++        BLOCK=triton.next_power_of_2(num_splits),
++        num_warps=1,
++    )
++    gathered = tensor_model_parallel_all_gather(candidates, dim=-1)
++    tp_size = gathered.shape[-1] // 2
++    _draft_topk1_global_finalize_kernel[(bs,)](
++        gathered,
++        topk_p,
++        topk_index,
++        positions if advance_positions else topk_index,
++        draft_tokens if write_draft_token else topk_index,
++        draft_tokens.stride(0) if write_draft_token else 0,
++        draft_token_column,
++        TP_SIZE=tp_size,
++        WRITE_DRAFT_TOKEN=write_draft_token,
++        ADVANCE_POSITIONS=advance_positions,
++        BLOCK=triton.next_power_of_2(tp_size),
++        num_warps=1,
++    )
++    return topk_p, topk_index
+diff --git a/python/sglang/srt/environ.py b/python/sglang/srt/environ.py
+index 04ead276..29496e5a 100644
+--- a/python/sglang/srt/environ.py
++++ b/python/sglang/srt/environ.py
+@@ -319,6 +319,9 @@ class Envs:
+     # Pack independent 64-key QSA index groups into each decode CTA.
+     # Zero selects the B200 row-count heuristic; a positive value forces it.
+     SGLANG_QSA_MQA_GROUPS_PER_CTA = EnvInt(0)
++    # Keep greedy Qwen4 MTP logits vocab-parallel and all-gather only one
++    # (max, token-id) candidate per rank and row.
++    SGLANG_QWEN4_MTP_DISTRIBUTED_TOPK1 = EnvBool(False)
+     SGLANG_PREFETCH_BLOCK_SIZE_MB = EnvInt(16)
+     SGLANG_GEMMA_OUT_OF_PLACE_POSITION_MUTATION = EnvBool(False)
+     SGLANG_ENABLE_WEIGHT_LOADER_V2 = EnvBool(False)
+diff --git a/python/sglang/srt/layers/logits_processor.py b/python/sglang/srt/layers/logits_processor.py
+index b488bfa9..28770611 100644
+--- a/python/sglang/srt/layers/logits_processor.py
++++ b/python/sglang/srt/layers/logits_processor.py
+@@ -209,6 +209,11 @@ class LogitsProcessorOutput:
+     # The last hidden layers
+     hidden_states: Optional[torch.Tensor] = None
+ 
++    # Greedy MTP may keep logits vocab-parallel and perform an exact
++    # distributed argmax instead of gathering the full vocabulary.
++    next_token_logits_vocab_start: Optional[int] = None
++    next_token_logits_global_vocab_size: Optional[int] = None
++
+     ## Part 2: This part will be assigned in python/sglang/srt/layers/sampler.py::Sampler
+     # he log probs of output tokens, if SGLANG_RETURN_ORIGINAL_LOGPROB = True, will get the log probs before applying temperature. If False, will get the log probs before applying temperature.
+     next_token_logprobs: Optional[torch.Tensor] = None
+diff --git a/python/sglang/srt/model_executor/runner/decode_cuda_graph_runner.py b/python/sglang/srt/model_executor/runner/decode_cuda_graph_runner.py
+index d5160d43..e90053b2 100644
+--- a/python/sglang/srt/model_executor/runner/decode_cuda_graph_runner.py
++++ b/python/sglang/srt/model_executor/runner/decode_cuda_graph_runner.py
+@@ -1461,6 +1461,10 @@ class DecodeCudaGraphRunner(BaseCudaGraphRunner):
+             return LogitsProcessorOutput(
+                 next_token_logits=next_token_logits,
+                 full_logits=full_logits,
++                next_token_logits_vocab_start=output.next_token_logits_vocab_start,
++                next_token_logits_global_vocab_size=(
++                    output.next_token_logits_global_vocab_size
++                ),
+                 hidden_states=(
+                     output.hidden_states[: self.raw_num_token]
+                     if output.hidden_states is not None
+diff --git a/python/sglang/srt/model_executor/runner/prefill_cuda_graph_runner.py b/python/sglang/srt/model_executor/runner/prefill_cuda_graph_runner.py
+index ab330617..521e96fe 100644
+--- a/python/sglang/srt/model_executor/runner/prefill_cuda_graph_runner.py
++++ b/python/sglang/srt/model_executor/runner/prefill_cuda_graph_runner.py
+@@ -1885,6 +1885,10 @@ class PrefillCudaGraphRunner(BaseCudaGraphRunner):
+                 if output.next_token_logits is not None
+                 else None
+             ),
++            next_token_logits_vocab_start=output.next_token_logits_vocab_start,
++            next_token_logits_global_vocab_size=(
++                output.next_token_logits_global_vocab_size
++            ),
+             hidden_states=(
+                 output.hidden_states[: self.raw_num_tokens]
+                 if output.hidden_states is not None
+diff --git a/python/sglang/srt/models/qwen4_exp_mtp.py b/python/sglang/srt/models/qwen4_exp_mtp.py
+index 31a87301..b07a2227 100644
+--- a/python/sglang/srt/models/qwen4_exp_mtp.py
++++ b/python/sglang/srt/models/qwen4_exp_mtp.py
+@@ -19,7 +19,7 @@ from sglang.srt.layers.vocab_parallel_embedding import ParallelLMHead
+ from sglang.srt.model_executor.forward_batch_info import ForwardBatch
+ from sglang.srt.models.qwen3_5_mtp import Qwen3_5ForCausalLMMTP, _mtp_quant_config
+ from sglang.srt.models.qwen4_exp import Qwen4ExpModel
+-from sglang.srt.runtime_context import get_model, get_parallel
++from sglang.srt.runtime_context import get_model, get_parallel, get_spec
+ from sglang.srt.utils import add_prefix, is_npu
+ 
+ logger = logging.getLogger(__name__)
+@@ -68,7 +68,36 @@ class Qwen4ExpForCausalLMMTP(Qwen3_5ForCausalLMMTP):
+             prefix=add_prefix("model.shared_head.head", prefix),
+             use_attn_tp_group=get_parallel().enable_dp_lm_head,
+         )
+-        self.logits_processor = LogitsProcessor(config)
++        self._distributed_topk1 = envs.SGLANG_QWEN4_MTP_DISTRIBUTED_TOPK1.get()
++        if self._distributed_topk1:
++            spec = get_spec()
++            if (
++                spec.speculative_eagle_topk != 1
++                or spec.speculative_use_rejection_sampling
++            ):
++                raise ValueError(
++                    "Qwen4 distributed MTP top-1 requires eagle_topk=1 and "
++                    "rejection sampling disabled"
++                )
++            if self.lm_head.num_added_embeddings != 0:
++                raise ValueError("distributed MTP top-1 does not support added vocab")
++            if self.lm_head.num_embeddings_padded != config.vocab_size:
++                raise ValueError(
++                    "distributed MTP top-1 requires an unpadded vocabulary"
++                )
++            self._local_vocab_start = (
++                self.lm_head.shard_indices.padded_org_vocab_start_index
++            )
++            expected_start = (
++                get_parallel().tp_rank * self.lm_head.num_embeddings_per_partition
++            )
++            if self._local_vocab_start != expected_start:
++                raise ValueError("distributed MTP top-1 requires contiguous TP shards")
++        else:
++            self._local_vocab_start = None
++        self.logits_processor = LogitsProcessor(
++            config, skip_all_gather=self._distributed_topk1
++        )
+ 
+     def _init_pre_fc_norms(self, config: PretrainedConfig) -> None:
+         self.pre_fc_norm_embedding = GemmaRMSNorm(
+@@ -221,6 +250,9 @@ class Qwen4ExpForCausalLMMTP(Qwen3_5ForCausalLMMTP):
+         logits_output = self.logits_processor(
+             input_ids, hidden_states, self.lm_head, forward_batch
+         )
++        if self._distributed_topk1:
++            logits_output.next_token_logits_vocab_start = self._local_vocab_start
++            logits_output.next_token_logits_global_vocab_size = self.config.vocab_size
+         self._set_hc_logits_hidden_states(
+             logits_output, hc_hidden_states, forward_batch
+         )
+diff --git a/python/sglang/srt/speculative/eagle_draft_extend_cuda_graph_runner.py b/python/sglang/srt/speculative/eagle_draft_extend_cuda_graph_runner.py
+index 4aeb6c5a..e87cf991 100644
+--- a/python/sglang/srt/speculative/eagle_draft_extend_cuda_graph_runner.py
++++ b/python/sglang/srt/speculative/eagle_draft_extend_cuda_graph_runner.py
+@@ -641,6 +641,10 @@ class EAGLEDraftExtendCudaGraphRunner(DecodeCudaGraphRunner):
+ 
+         out = LogitsProcessorOutput(
+             next_token_logits=out.next_token_logits[:raw_bs],
++            next_token_logits_vocab_start=out.next_token_logits_vocab_start,
++            next_token_logits_global_vocab_size=(
++                out.next_token_logits_global_vocab_size
++            ),
+             # CUDA graph replay reuses its captured output storage. These states
+             # survive into the next draft step, so detach them from that buffer.
+             hidden_states=out.hidden_states[:raw_bs].clone(),
+diff --git a/python/sglang/srt/speculative/eagle_worker_v2.py b/python/sglang/srt/speculative/eagle_worker_v2.py
+index 539b96eb..6cf83fff 100644
+--- a/python/sglang/srt/speculative/eagle_worker_v2.py
++++ b/python/sglang/srt/speculative/eagle_worker_v2.py
+@@ -6,7 +6,10 @@ from typing import List, Optional
+ 
+ import torch
+ 
+-from sglang.kernels.ops.speculative.topk1 import draft_topk1_postprocess
++from sglang.kernels.ops.speculative.topk1 import (
++    draft_topk1_postprocess,
++    draft_topk1_postprocess_distributed,
++)
+ from sglang.srt.configs.model_config import get_dsa_mtp_topk_width
+ from sglang.srt.distributed import get_pp_group
+ from sglang.srt.distributed.parallel_state_wrapper import ParallelState
+@@ -771,7 +774,20 @@ class EagleDraftWorker(EagleDraftWorkerBase):
+                     draft_probs_list.append(probs)
+                     forward_batch.positions.add_(1)
+                 elif self.topk == 1 and not _is_hip:
+-                    if _is_cuda:
++                    if logits_output.next_token_logits_vocab_start is not None:
++                        topk_p, topk_index = draft_topk1_postprocess_distributed(
++                            logits_output.next_token_logits,
++                            forward_batch.positions,
++                            vocab_start_index=(
++                                logits_output.next_token_logits_vocab_start
++                            ),
++                            global_vocab_size=(
++                                logits_output.next_token_logits_global_vocab_size
++                            ),
++                            draft_tokens=draft_tokens_topk1,
++                            draft_token_column=i + 1,
++                        )
++                    elif _is_cuda:
+                         topk_p, topk_index = draft_topk1_postprocess(
+                             logits_output.next_token_logits,
+                             forward_batch.positions,
+@@ -792,11 +808,15 @@ class EagleDraftWorker(EagleDraftWorkerBase):
+                     )
+                     topk_p, topk_index = fast_topk(probs, self.topk, dim=-1)
+                     forward_batch.positions.add_(1)
++                logits_vocab_size = (
++                    logits_output.next_token_logits_global_vocab_size
++                    or logits_output.next_token_logits.shape[-1]
++                )
+                 maybe_detect_oob(
+                     topk_index,
+                     0,
+-                    logits_output.next_token_logits.shape[-1],
+-                    f"draft_forward step {i}: topk_index OOB vs vocab_size={logits_output.next_token_logits.shape[-1]}",
++                    logits_vocab_size,
++                    f"draft_forward step {i}: topk_index OOB vs vocab_size={logits_vocab_size}",
+                 )
+                 if self.hot_token_id is not None:
+                     topk_index = self.hot_token_id[topk_index]
+@@ -970,15 +990,26 @@ class EagleDraftWorker(EagleDraftWorkerBase):
+ 
+         # Assemble the next-iter draft spec_info from the extend output.
+         use_rejection_sampling = get_spec().speculative_use_rejection_sampling
+-        probs = renorm_draft_probs(
+-            logits_output.next_token_logits,
+-            batch.sampling_info,
+-            use_rejection_sampling,
+-        )
+-        if use_rejection_sampling:
+-            topk_p, topk_index = fast_sample(probs, num_samples=1)
++        if logits_output.next_token_logits_vocab_start is not None:
++            topk_p, topk_index = draft_topk1_postprocess_distributed(
++                logits_output.next_token_logits,
++                None,
++                vocab_start_index=logits_output.next_token_logits_vocab_start,
++                global_vocab_size=(
++                    logits_output.next_token_logits_global_vocab_size
++                ),
++            )
++            probs = None
+         else:
+-            topk_p, topk_index = fast_topk(probs, self.topk, dim=-1)
++            probs = renorm_draft_probs(
++                logits_output.next_token_logits,
++                batch.sampling_info,
++                use_rejection_sampling,
++            )
++            if use_rejection_sampling:
++                topk_p, topk_index = fast_sample(probs, num_samples=1)
++            else:
++                topk_p, topk_index = fast_topk(probs, self.topk, dim=-1)
+         return EagleDraftInput(
+             topk_p=topk_p,
+             topk_index=topk_index,
+@@ -1119,12 +1150,26 @@ class EagleDraftWorker(EagleDraftWorkerBase):
+                 batch.sampling_info.temperatures,
+             )
+         elif self.topk == 1 and not _is_hip:
+-            # Gated to CUDA: see #26358 — ROCm's argmax tie-break corrupts
+-            # MTP draft selection on FP8 logits.
+-            ret_topk_index = torch.argmax(
+-                draft_logits_output.next_token_logits, dim=-1, keepdim=True
+-            )
+-            ret_topk_p = torch.ones_like(ret_topk_index, dtype=torch.float32)
++            if draft_logits_output.next_token_logits_vocab_start is not None:
++                ret_topk_p, ret_topk_index = draft_topk1_postprocess_distributed(
++                    draft_logits_output.next_token_logits,
++                    None,
++                    vocab_start_index=(
++                        draft_logits_output.next_token_logits_vocab_start
++                    ),
++                    global_vocab_size=(
++                        draft_logits_output.next_token_logits_global_vocab_size
++                    ),
++                )
++            else:
++                # Gated to CUDA: see #26358 — ROCm's argmax tie-break corrupts
++                # MTP draft selection on FP8 logits.
++                ret_topk_index = torch.argmax(
++                    draft_logits_output.next_token_logits, dim=-1, keepdim=True
++                )
++                ret_topk_p = torch.ones_like(
++                    ret_topk_index, dtype=torch.float32
++                )
+             ret_draft_probs = None
+         else:
+             probs = renorm_draft_probs(

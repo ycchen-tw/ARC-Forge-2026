@@ -1,0 +1,400 @@
+diff --git a/codex-rs/core/src/compact.rs b/codex-rs/core/src/compact.rs
+index 9aee7ec..3aa7c1c 100644
+--- a/codex-rs/core/src/compact.rs
++++ b/codex-rs/core/src/compact.rs
+@@ -19,9 +19,9 @@ use crate::responses_metadata::CompactionTurnMetadata;
+ use crate::session::PreviousTurnSettings;
+ use crate::session::session::Session;
+ use crate::session::step_context::StepContext;
+-use crate::session::turn::get_last_assistant_message_from_turn;
+ use crate::session::turn_context::TurnContext;
+ use crate::state::AutoCompactWindowIds;
++use crate::stream_events_utils::last_assistant_message_from_item;
+ use crate::util::backoff;
+ use codex_analytics::CodexCompactionEvent;
+ use codex_analytics::CompactionImplementation;
+@@ -51,7 +51,9 @@ use codex_protocol::protocol::EventMsg;
+ use codex_protocol::protocol::TurnStartedEvent;
+ use codex_protocol::protocol::WarningEvent;
+ use codex_protocol::user_input::UserInput;
++use codex_features::Feature;
+ use codex_rollout_trace::InferenceTraceContext;
++use codex_tools::ToolSpec;
+ use codex_utils_output_truncation::TruncationPolicy;
+ use codex_utils_output_truncation::approx_token_count;
+ use codex_utils_output_truncation::truncate_text;
+@@ -122,7 +124,17 @@ pub(crate) async fn run_inline_auto_compact_task(
+     initial_context_injection: InitialContextInjection,
+     reason: CompactionReason,
+     phase: CompactionPhase,
++    turn_tools: Arc<[ToolSpec]>,
+ ) -> CodexResult<()> {
++    // With `compaction_reuse_prefix` the summarization request carries the same tools as the
++    // turn it interrupts. Chat templates that render tool definitions ahead of the system text
++    // (Qwen3.x) otherwise make this request diverge from the cached conversation within the
++    // first few tokens, and a prefix cache (sglang radix) re-prefills the whole history.
++    let tools = turn_context
++        .config
++        .features
++        .enabled(Feature::CompactionReusePrefix)
++        .then_some(turn_tools);
+     let prompt = turn_context
+         .config
+         .compact_prompt
+@@ -143,6 +155,7 @@ pub(crate) async fn run_inline_auto_compact_task(
+         CompactionTrigger::Auto,
+         reason,
+         phase,
++        tools,
+     )
+     .await?;
+     Ok(())
+@@ -169,6 +182,7 @@ pub(crate) async fn run_compact_task(
+         CompactionTrigger::Manual,
+         CompactionReason::UserRequested,
+         CompactionPhase::StandaloneTurn,
++        /*tools*/ None,
+     )
+     .await?;
+     Ok(())
+@@ -182,6 +196,7 @@ async fn run_compact_task_inner(
+     trigger: CompactionTrigger,
+     reason: CompactionReason,
+     phase: CompactionPhase,
++    tools: Option<Arc<[ToolSpec]>>,
+ ) -> CodexResult<()> {
+     let compaction_metadata =
+         CompactionTurnMetadata::new(trigger, reason, CompactionImplementation::Responses, phase);
+@@ -216,6 +231,7 @@ async fn run_compact_task_inner(
+         input,
+         initial_context_injection,
+         compaction_metadata,
++        tools,
+     )
+     .await;
+     let status = compaction_status_from_result(&result);
+@@ -251,6 +267,7 @@ async fn run_compact_task_inner_impl(
+     input: Vec<UserInput>,
+     initial_context_injection: InitialContextInjection,
+     compaction_metadata: CompactionTurnMetadata,
++    tools: Option<Arc<[ToolSpec]>>,
+ ) -> CodexResult<String> {
+     let compaction_item = TurnItem::ContextCompaction(ContextCompactionItem::new());
+     sess.emit_turn_item_started(&turn_context, &compaction_item)
+@@ -276,16 +293,27 @@ async fn run_compact_task_inner_impl(
+         )
+         .await;
+ 
+-    let compaction_response_id = loop {
++    let (compaction_response_id, summary_suffix) = loop {
+         // Clone is required because of the loop
+         let turn_input = history
+             .clone()
+             .for_prompt(&turn_context.model_info().input_modalities);
+         let turn_input_len = turn_input.len();
+-        let prompt = Prompt {
+-            input: turn_input,
+-            base_instructions: sess.get_prompt_base_instructions().await,
+-            ..Default::default()
++        let prompt = match &tools {
++            // Same tools and parallel_tool_calls as a regular turn (session/turn.rs build_prompt);
++            // tool_choice stays "auto" -- "none" would make sglang drop the tools from the template.
++            Some(tools) => Prompt {
++                input: turn_input,
++                tools: Arc::clone(tools),
++                parallel_tool_calls: true,
++                base_instructions: sess.get_prompt_base_instructions().await,
++                ..Default::default()
++            },
++            None => Prompt {
++                input: turn_input,
++                base_instructions: sess.get_prompt_base_instructions().await,
++                ..Default::default()
++            },
+         };
+         let attempt_result = drain_to_completed(
+             &sess,
+@@ -297,8 +325,8 @@ async fn run_compact_task_inner_impl(
+         .await;
+ 
+         match attempt_result {
+-            Ok(response_id) => {
+-                break response_id;
++            Ok(completed) => {
++                break completed;
+             }
+             Err(err)
+                 if matches!(
+@@ -354,8 +382,6 @@ async fn run_compact_task_inner_impl(
+ 
+     let history_snapshot = sess.clone_history().await;
+     let history_items = history_snapshot.annotated_items();
+-    let summary_suffix =
+-        get_last_assistant_message_from_turn(history_snapshot.raw_items()).unwrap_or_default();
+     let summary_text = format!("{SUMMARY_PREFIX}\n{summary_suffix}");
+     let identity = if sess.guardian_context_mode == GuardianContextMode::ThreadOwned {
+         CompactedMessageIdentity::Preserve
+@@ -769,7 +795,17 @@ async fn drain_to_completed(
+     client_session: &mut ModelClientSession,
+     responses_metadata: &CodexResponsesMetadata,
+     prompt: &Prompt,
+-) -> CodexResult<String> {
++) -> CodexResult<(String, String)> {
++    // The summary is the last assistant message of *this* response. Scanning the whole history
++    // instead would, for a response without one, silently promote an older assistant message
++    // (or nothing) to the summary that replaces the history.
++    let mut summary: Option<String> = None;
++    let mut dropped_tool_calls = 0usize;
++    let strip_analysis = turn_context
++        .config
++        .features
++        .enabled(Feature::CompactionStripAnalysis);
++    let mut emptied_by_strip = false;
+     let mut stream = client_session
+         .stream(
+             prompt,
+@@ -792,7 +828,28 @@ async fn drain_to_completed(
+             ));
+         };
+         match event {
+-            Ok(ResponseEvent::OutputItemDone(item)) => {
++            Ok(ResponseEvent::OutputItemDone(mut item)) => {
++                // Nothing executes a call made here, and an unanswered call left in the history
++                // makes the next request invalid if compaction ends up failing.
++                if matches!(
++                    item,
++                    ResponseItem::FunctionCall { .. }
++                        | ResponseItem::CustomToolCall { .. }
++                        | ResponseItem::LocalShellCall { .. }
++                        | ResponseItem::ToolSearchCall { .. }
++                ) {
++                    dropped_tool_calls += 1;
++                    continue;
++                }
++                // Stripped before anything keeps the item: the session history (and with it the
++                // rollout and the guardian checkpoint) and the summary taken from it below.
++                if strip_analysis && strip_analysis_from_assistant_message(&mut item) {
++                    emptied_by_strip = true;
++                }
++                if let Some(message) = last_assistant_message_from_item(&item, /*plan_mode*/ false)
++                {
++                    summary = Some(message);
++                }
+                 sess.record_conversation_items(turn_context, std::slice::from_ref(&item))
+                     .await;
+             }
+@@ -817,7 +874,18 @@ async fn drain_to_completed(
+                 .await;
+                 sess.update_token_usage_info(turn_context, token_usage.as_ref())
+                     .await?;
+-                return Ok(response_id);
++                // A retryable error: the caller's loop re-sends the same request.
++                let Some(summary) = summary else {
++                    return Err(CodexErr::Stream(if emptied_by_strip {
++                        format!("compaction response {response_id} has nothing outside <analysis>")
++                    } else {
++                        format!(
++                            "compaction response {response_id} has no assistant message \
++                             (tool calls dropped: {dropped_tool_calls})"
++                        )
++                    }));
++                };
++                return Ok((response_id, summary));
+             }
+             Ok(_) => continue,
+             Err(e) => return Err(e),
+@@ -825,6 +893,50 @@ async fn drain_to_completed(
+     }
+ }
+ 
++/// Applies [`strip_analysis_block`] to each output text of an assistant message, in place.
++/// Returns true when the message had text and nothing is left of it.
++fn strip_analysis_from_assistant_message(item: &mut ResponseItem) -> bool {
++    let ResponseItem::Message { role, content, .. } = item else {
++        return false;
++    };
++    if role != "assistant" {
++        return false;
++    }
++    let mut had_text = false;
++    let mut left_text = false;
++    for part in content.iter_mut() {
++        if let ContentItem::OutputText { text } = part {
++            had_text |= !text.trim().is_empty();
++            *text = strip_analysis_block(text);
++            left_text |= !text.is_empty();
++        }
++    }
++    had_text && !left_text
++}
++
++/// Removes every `<analysis>...</analysis>` block (a scratchpad a compaction prompt may ask for
++/// ahead of the summary) and, if an `<analysis>` is left unclosed, everything from it to the end.
++/// Text outside the blocks is kept; only leading and trailing whitespace is trimmed.
++pub(crate) fn strip_analysis_block(text: &str) -> String {
++    const OPEN: &str = "<analysis>";
++    const CLOSE: &str = "</analysis>";
++    let mut kept = String::with_capacity(text.len());
++    let mut rest = text;
++    while let Some(start) = rest.find(OPEN) {
++        kept.push_str(&rest[..start]);
++        let after_open = &rest[start + OPEN.len()..];
++        match after_open.find(CLOSE) {
++            Some(end) => rest = &after_open[end + CLOSE.len()..],
++            None => {
++                rest = "";
++                break;
++            }
++        }
++    }
++    kept.push_str(rest);
++    kept.trim().to_string()
++}
++
+ #[cfg(test)]
+ #[path = "compact_tests.rs"]
+ mod tests;
+diff --git a/codex-rs/core/src/compact_tests.rs b/codex-rs/core/src/compact_tests.rs
+index 72fa09a..86f807e 100644
+--- a/codex-rs/core/src/compact_tests.rs
++++ b/codex-rs/core/src/compact_tests.rs
+@@ -792,3 +792,67 @@ fn insert_initial_context_before_last_real_user_or_summary_keeps_compaction_last
+     ];
+     assert_eq!(refreshed, expected);
+ }
++
++#[test]
++fn strip_analysis_block_without_block_only_trims() {
++    assert_eq!(strip_analysis_block("  ## State\nlevel 2  \n"), "## State\nlevel 2");
++    assert_eq!(strip_analysis_block("no tags </analysis> here"), "no tags </analysis> here");
++}
++
++#[test]
++fn strip_analysis_block_removes_leading_block() {
++    assert_eq!(
++        strip_analysis_block("<analysis>\ndraft\n</analysis>\n## Game state\nlevel 2"),
++        "## Game state\nlevel 2"
++    );
++}
++
++#[test]
++fn strip_analysis_block_removes_every_block_and_keeps_text_between() {
++    assert_eq!(
++        strip_analysis_block("a<analysis>x</analysis>b\n<analysis>y\n</analysis>c"),
++        "ab\nc"
++    );
++}
++
++#[test]
++fn strip_analysis_block_drops_unclosed_block_to_end() {
++    assert_eq!(
++        strip_analysis_block("## Summary\nkeep\n<analysis>unfinished draft"),
++        "## Summary\nkeep"
++    );
++    assert_eq!(
++        strip_analysis_block("<analysis>a</analysis>kept<analysis>b"),
++        "kept"
++    );
++}
++
++#[test]
++fn strip_analysis_block_analysis_only_is_empty() {
++    assert_eq!(strip_analysis_block("<analysis>only a draft</analysis>\n"), "");
++    assert_eq!(strip_analysis_block("  <analysis>never closed"), "");
++}
++
++#[test]
++fn strip_analysis_from_assistant_message_rewrites_in_place() {
++    let message = |role: &str, text: &str| ResponseItem::Message {
++        id: None,
++        role: role.to_string(),
++        content: vec![ContentItem::OutputText {
++            text: text.to_string(),
++        }],
++        phase: None,
++        internal_chat_message_metadata_passthrough: None,
++    };
++    let mut item = message("assistant", "<analysis>draft</analysis>\n## State\nx");
++    assert!(!strip_analysis_from_assistant_message(&mut item));
++    assert_eq!(item, message("assistant", "## State\nx"));
++
++    let mut only_draft = message("assistant", "<analysis>draft</analysis>");
++    assert!(strip_analysis_from_assistant_message(&mut only_draft));
++    assert_eq!(only_draft, message("assistant", ""));
++
++    let mut user = message("user", "<analysis>kept</analysis>");
++    assert!(!strip_analysis_from_assistant_message(&mut user));
++    assert_eq!(user, message("user", "<analysis>kept</analysis>"));
++}
+diff --git a/codex-rs/core/src/session/turn.rs b/codex-rs/core/src/session/turn.rs
+index 4719e1d..e9a1a03 100644
+--- a/codex-rs/core/src/session/turn.rs
++++ b/codex-rs/core/src/session/turn.rs
+@@ -46,7 +46,6 @@ use crate::stream_events_utils::TurnItemContributorPolicy;
+ use crate::stream_events_utils::finalize_non_tool_response_item;
+ use crate::stream_events_utils::handle_non_tool_response_item;
+ use crate::stream_events_utils::handle_output_item_done;
+-use crate::stream_events_utils::last_assistant_message_from_item;
+ use crate::stream_events_utils::mark_thread_memory_mode_polluted_if_external_context;
+ use crate::stream_events_utils::raw_assistant_output_text_from_item;
+ use crate::stream_events_utils::record_completed_response_item_with_finalized_facts;
+@@ -1325,6 +1324,7 @@ async fn run_auto_compact(
+                 initial_context_injection,
+                 reason,
+                 phase,
++                step_context.tool_router.model_visible_specs(),
+             )
+             .await?;
+         }
+@@ -2880,17 +2880,6 @@ async fn try_run_sampling_request(
+     outcome
+ }
+ 
+-pub(crate) fn get_last_assistant_message_from_turn<'a>(
+-    responses: impl DoubleEndedIterator<Item = &'a ResponseItem>,
+-) -> Option<String> {
+-    for item in responses.rev() {
+-        if let Some(message) = last_assistant_message_from_item(item, /*plan_mode*/ false) {
+-            return Some(message);
+-        }
+-    }
+-    None
+-}
+-
+ #[cfg(test)]
+ #[path = "turn_tests.rs"]
+ mod tests;
+diff --git a/codex-rs/features/src/lib.rs b/codex-rs/features/src/lib.rs
+index a891566..3afb104 100644
+--- a/codex-rs/features/src/lib.rs
++++ b/codex-rs/features/src/lib.rs
+@@ -112,6 +112,10 @@ pub enum Feature {
+     ContentItemKinds,
+     /// Tag Responses requests with an sglang session id and close it when the window retires.
+     SglangSessionRelease,
++    /// Send local auto-compaction with the triggering turn's tools so its prompt extends the cached prefix.
++    CompactionReusePrefix,
++    /// Drop `<analysis>` scratchpad blocks from a local compaction summary before it is stored.
++    CompactionStripAnalysis,
+     /// Record model-attempted tool calls in internal Responses metadata.
+     ExecutedToolCallMetadata,
+     /// Enable JavaScript code mode backed by the standalone host process.
+@@ -1017,6 +1021,18 @@ pub const FEATURES: &[FeatureSpec] = &[
+         stage: Stage::UnderDevelopment,
+         default_enabled: false,
+     },
++    FeatureSpec {
++        id: Feature::CompactionReusePrefix,
++        key: "compaction_reuse_prefix",
++        stage: Stage::UnderDevelopment,
++        default_enabled: false,
++    },
++    FeatureSpec {
++        id: Feature::CompactionStripAnalysis,
++        key: "compaction_strip_analysis",
++        stage: Stage::UnderDevelopment,
++        default_enabled: false,
++    },
+     FeatureSpec {
+         id: Feature::ExecutedToolCallMetadata,
+         key: "executed_tool_call_metadata",

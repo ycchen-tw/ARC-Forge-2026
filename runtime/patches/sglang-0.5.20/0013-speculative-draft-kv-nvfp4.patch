@@ -1,0 +1,23 @@
+From f925a9b9f7849a8ab1407c250ea97e35c26648fb Mon Sep 17 00:00:00 2001
+From: arc <a@b.c>
+Date: Sat, 19 Sep 2026 08:41:51 +0000
+Subject: [PATCH 6/7] arc: 0034-speculative-draft-kv-nvfp4
+
+(cherry picked from commit ab05d4649cc7025d6f3889743e6bbfdd4cdd0718)
+---
+ python/sglang/srt/arg_groups/fields/spec.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/python/sglang/srt/arg_groups/fields/spec.py b/python/sglang/srt/arg_groups/fields/spec.py
+index f9dde3e7..7312313b 100644
+--- a/python/sglang/srt/arg_groups/fields/spec.py
++++ b/python/sglang/srt/arg_groups/fields/spec.py
+@@ -155,7 +155,7 @@ class Spec(msgspec.Struct):
+             "pool; the saving shows up as free device memory, so raise "
+             "--mem-fraction-static to convert it into KV capacity. Default follows "
+             "--kv-cache-dtype.",
+-            choices=["auto", "fp8_e5m2", "fp8_e4m3", "bf16", "bfloat16"],
++            choices=["auto", "fp8_e5m2", "fp8_e4m3", "bf16", "bfloat16", "nvfp4"],
+         ),
+     ] = None
+     speculative_draft_window_size: A[

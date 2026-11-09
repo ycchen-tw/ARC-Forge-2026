@@ -1,0 +1,8 @@
+{
+  "ownerSlug": "threerabbits",
+  "isPrivate": true,
+  "slug": "qwen38fn-int3-arc2r4-v30-patch",
+  "title": "Qwen3.8 FN INT3 ARC2 RL r4 v30 patch",
+  "subtitle": "The 516 tensors ARC2 RL r4 step 30 changed, over the QAD v3 INT3 package",
+  "description": "# Model Summary\n\nNot a checkpoint on its own (no config.json): a weight patch, the 516 tensors whose bytes ARC2 RL r4 (ctx64k90v2, all-tests reward) weight version 30 (LoRA r8 merged, dense QAT block FP8) changed in threerabbits/qwen38fn-gean320-int3-gptq/Transformers/default/3 (QAD v3, qadmix-R v1000), one patch-<shard>.safetensors per rewritten shard (3.35 GB), patch.json (per-tensor sha256, base manifest 92b231d01c2aa5810fb024efd204ed47a957f3d95aec84c96f6d5fac0302d57c, target deploy manifest 12df8569a3469f74b11a118d57299c295496c35e937610c91d40edca905a15a9) and the target deploy_manifest.json. The arc-forge AGI-2 L4 notebook (build_notebook.py model_patch) serves the base package and the v16_patch sitecustomize (ARC_L4_WEIGHT_PATCH) swaps these tensors in at load. Built by work/qwen38fn_rl/rl_weight_patch.py, which checked base + patch == the overlay's shards byte for byte."
+}

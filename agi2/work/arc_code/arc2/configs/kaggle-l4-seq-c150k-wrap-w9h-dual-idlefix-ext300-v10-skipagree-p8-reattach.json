@@ -1,0 +1,63 @@
+{
+ "schema_version": 1,
+ "concurrency": null,
+ "fence": "posix",
+ "effort": "xhigh",
+ "model_context_window": 150000,
+ "auto_compact_token_limit": 100000,
+ "output_token_budget": 200000,
+ "task_wall_seconds": 32400,
+ "max_sessions": 3,
+ "min_resume_tokens": 10000,
+ "prompts": "v3y",
+ "driver_config": {
+  "model_input_modalities": "[\"text\",\"image\"]",
+  "features.sglang_session_release": "true",
+  "features.compaction_reuse_prefix": "true",
+  "features.compaction_strip_analysis": "true",
+  "model_providers.local.stream_max_retries": "12",
+  "model_providers.local.request_max_retries": "12",
+  "features.pre_compact_reminder": "true",
+  "model_providers.local.stream_idle_timeout_ms": "32400000",
+  "features.server_reasoning_included": "true"
+ },
+ "process_data_max": "6G",
+ "game_memory_max": "8G",
+ "watchdog_headroom": "12G",
+ "watchdog_cpu_seconds": 900,
+ "oom_score_adj": 1000,
+ "net_probe": "",
+ "uid_base": 31000,
+ "budget_poll_seconds": 5,
+ "heartbeat_seconds": 60,
+ "keep_driver_home": true,
+ "model_error_wait_seconds": 1800,
+ "max_failures": 9,
+ "note": "Kaggle AGI-2 10-29 = kaggle-l4-seq-c150k-wrap-w9h-dual-idlefix-ext300-v10-skipagree.json with two additions and nothing else changed (auto_compact_token_limit stays 100000): (1) driver_config features.server_reasoning_included=true (codex p8 patch 0008: the context check no longer adds the reasoning before the last user message a second time; needs codex p8, threerabbits/arcforge-codex-0154-p8, sha256 3b4dc034...; p7 refuses the key under --strict-config); (2) reattach_images=true (model_proxy.ImageReattach: codex keeps only the input_text of the kickoff message after a compaction and drops the puzzle images; the proxy puts the whole message back; each episode kind recognises its own kickoff; the fresh-thread hand-off after a context overflow is not re-attached). Previous note: Kaggle AGI-2 10-27 (user: bring the frozen toolkit arc_v10 + prompts v3y, and skip agreed re-refiners) = kaggle-l4-seq-c150k-wrap-w9h-dual-idlefix-ext300.json (57640701) with: workspace arc.py = arc_v10.py and TOOLS.md = arc_v10_TOOLS.md (the arc2 harness loop's toolkit frozen for RL: v3y 8 rounds on eval120fix -0.04 [-2.19,+2.16] vs base at -5.1% tokens); s0 prompts v3y, s2 v3ydual (v3dual's two solution2 paragraphs, compact prompt and wrap-up on v3y); refiners stay on v3refine-dual; workspace_pythonpath (fence posix: PYTHONPATH = pyshadow:workspace, so scripts in /tmp import arc; v3w 174 'No module named arc' in 8 rounds, v3y 0); rerefine_skip_agreed (no re-refiner when s0 and s2 pass train and s0, s2 and refine_exp's own attempt_1 agree). Previous note: kaggle-l4-seq-c150k-wrap-w9h-dual-idlefix.json (57603104, public 84.31) with one change (user 2026-10-25: give hard tasks a longer solver budget). budget_extension: when an s0 episode passes its 200,000-token budget, the harness asks a time gate (run_arc2_seq.extension_decision: the episode's own average output rate so far gives the time for 68,000 more tokens; granted when the episode wall still holds it plus 900 s and the deadline still leaves it plus a 4,500 s refiner reserve plus 900 s). Granted: no wrap-up at 200,000; the budget moves to 268,000 (budget.txt shows it; no message is injected, because codex patch 0005 injects once per context window and the wrap-up must still get in), the wrap-up comes at 268,000 and the hard stop at 300,000. Denied, s2 and the refiners: as before (200,000 + 32,000). Why s0 only and 300k: on the three uncapped b200b eval120 runs (10-23) 56-73% of the points the final submission missed are on tasks with a budget-hit solver; G4 uncapped runs solved several of them at 250-450k; a C128 Kaggle schedule simulation with a harder (Kaggle-like) task mix puts the cost of 300k for s0 at ~0 (s0 starts first) and 400k past the 9 h wall at ~12 tok/s per stream. The proxy also treats a response cut at the context edge (input + output within 256 of the context) and a 'longer than the context' failure as context full, so codex's same-thread resends (10-24 pod: 4/600 episodes, one 13 x 290 s) become a fresh thread. Previous note: kaggle-l4-seq-c150k-wrap-w9h-dual.json with two changes (10-24). (1) codex stream_idle_timeout_ms 32,400,000 = the 9 h episode wall (default 300,000): the 12 h C128 Save & Run collapsed from ~2 h on 2,597 'idle timeout waiting for SSE' resends (sglang holds compaction summaries until response.completed; 171-290 s at C128); the harness wall and deadline still stop every episode. (2) driver_env_extra _RJEM_MALLOC_CONF narenas:1,dirty_decay_ms:0,muzzy_decay_ms:0 for codex's jemalloc (default narenas 4 x CPUs): PC mock, 200 tool turns, codex anon 84-86 -> 39 MB, same time; pod codex ran 90-135 MB x 128. Base: kaggle-l4-seq-c150k-wrap.json (codex2wr, 7f23625) with four changes (user 2026-10-24, for the C128 L4 submission). (1) task_wall_seconds 32,400 (was 21,600): a Kaggle rerun schedule simulation over the student-trajectory QAD R eval120 run (480 episodes, Kaggle scheduling rules, rate calibrated to the 10-22 Save & Run) has C128 solvers that use their whole budget hit the 6 h wall once the per-stream rate is 0.8x the Save & Run one; 9 h removes those wall stops in every slowed scenario; the 700-minute deadline still caps every episode. (2) ind_prompts v3dual: s2 runs prompts v3dual (v3 plus an optional self-contained solution2.py for a second reading that passes every training pair; docs/research/arc2_dual_solver_20261023.md); s0 stays v3. (3) second_solution solution2.py: the harness harvests it from s0 / s2 like solution.py; it counts only when it passes every training pair, and only where its output differs from the episode's first answer. (4) refine_prompts v3refine-dual: the refiners see each candidate's second answer (candidates/<X>/test_J_output2.json, check.txt) and the summary in the brief; the ind fallback and the refiners' fill take second answers after both solvers' first answers. The rest as in the base config: Kaggle L4x4 two attempts per task + wrap-up + re-refiner filler (user 2026-10-13) = kaggle-l4-seq-c150k.json (the 57109034 submission's config: s0 + s2 at 200,000 output tokens, refiner refine_exp at 100,000, --solvers-first, each episode on the least busy DP, posix fence without netns, window 150,000 / compact 100,000, xhigh, prompts v3) with three changes. (1) No 65k midpoint reminder: it was added for a 100k cap without compaction, never measured a gain (G4 v5 vs v3c +14/-12), and now fires in every context window saying 'half the budget' at about a quarter. (2) wrapup_tokens 32,000: when the 200,000 budget is used, the proxy's response-end hook writes the wrap-up message (prompts v3/wrapup.md: write the best rule into solution.py, run check.py, write notes.md, stop) into codex's compact_reminder, and patch 0005 injects it into the running turn at the next follow-up -- same thread, same effort, prefix cache kept; the proxy stops the session at 232,000. Refiners get half (16,000, prompts v3refine/wrapup.md: fill final/). 32,000 because the response crossing the line still has 9.8k to go on average (b200 eval120 x2, 10,311 solver responses; token-weighted p90 response 51k). features.pre_compact_reminder stays on (the wrap-up uses it). (3) task_wall_seconds 21,600 (was 14,400): about 15 tok/s per stream at C96 makes 232,000 about 4.3 h. kaggle_run adds the re-refiner filler (rerefine: an independent second refine_exp in slots the main line can no longer use; while main episodes remain only with --filler-guard 7,200 s left to the deadline -- they take no slot but slow every step of the main line's tail, and a 60-minute guard cut 1-5 more main episodes in the 10-13 schedule simulation -- and --filler-min-left 3,600 s once the main line is done) and submits refine_vote (refine_exp and the re-refiner voted, a1 two votes, a2 one). max_failures 9 as before.",
+ "reattach_images": true,
+ "network_namespace": false,
+ "workspace_helper": true,
+ "midpoint_reminder_tokens": null,
+ "best_snapshot": true,
+ "view": "text",
+ "check_call_limit": null,
+ "wrapup_tokens": 32000,
+ "ind_prompts": "v3ydual",
+ "refine_prompts": "v3refine-dual",
+ "second_solution": "solution2.py",
+ "driver_env_extra": {
+  "_RJEM_MALLOC_CONF": "narenas:1,dirty_decay_ms:0,muzzy_decay_ms:0"
+ },
+ "budget_extension": {
+  "extra_tokens": 68000,
+  "kinds": [
+   "first"
+  ],
+  "refine_reserve_seconds": 4500,
+  "margin_seconds": 900
+ },
+ "workspace_helper_file": "arc_v10.py",
+ "workspace_doc_file": "arc_v10_TOOLS.md",
+ "workspace_pythonpath": true,
+ "rerefine_skip_agreed": true
+}

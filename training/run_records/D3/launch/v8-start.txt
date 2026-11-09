@@ -1,0 +1,10 @@
+RL_RUN=$ARC_RUNS/qwen38fn_rl/20261030-arc3v8-g2seed-18g-235t-hw-g16-b256-r4c64-fp8kv-win1-note-codex-fullft-lr3e-6-wu2-tk5l-topp95k20-promptmean-mis-qadR-public25-contaminated  start  head ce7b463ff  topology tp1x4 gpus 0,1,2,3,4,5,6,7
+ok: 235 train tasks, 2 held-out tasks, run_root $ARC_RUNS/qwen38fn_rl/20261030-arc3v8-g2seed-18g-235t-hw-g16-b256-r4c64-fp8kv-win1-note-codex-fullft-lr3e-6-wu2-tk5l-topp95k20-promptmean-mis-qadR-public25-contaminated
+baseline: 2 tasks x 4 samples, out $ARC_RUNS/qwen38fn_rl/20261030-arc3v8-g2seed-18g-235t-hw-g16-b256-r4c64-fp8kv-win1-note-codex-fullft-lr3e-6-wu2-tk5l-topp95k20-promptmean-mis-qadR-public25-contaminated/baseline-b32k
+fork lock: f9cf529b05a27878ff59b40a16b2f5477074dbc0
+serve profile: perf-main-fp16-ser-opt-lazyfix-l8-a16-topp-inldev (lock b200-rl-topp-inldev-1026)
+rollout temperature: ARC_RESPONSES_DEFAULT_TEMPERATURE=1.0 ARC_RESPONSES_DEFAULT_TOP_P=0.95 ARC_RESPONSES_DEFAULT_TOP_K=20
+vocab limit: ARC_LOGITS_VOCAB_LIMIT=248077
+drafter: $ARC_RUNS/qwen38fn_rl/dflash-rollout/drafter/planb-l8-s25562/deploy-fp8
+lineage: qwen38fn-qadR1000-int3-gptq / qwen38fn-qadR1000-int3-bf16dense: 1580 shared tensors identical (7.6 GiB compared; 144 only served, 0 only trained)
+plan.json has no init: the replicas serve the base

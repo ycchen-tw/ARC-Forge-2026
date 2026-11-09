@@ -1,0 +1,408 @@
+{
+ "by_split": {
+  "nemotron": {
+   "heldout": {
+    "jobs": 709,
+    "items": 709,
+    "tokens": 3106247,
+    "supervised": 2900421,
+    "eligible_anchors": 2899712
+   },
+   "train": {
+    "jobs": 74867,
+    "items": 74867,
+    "tokens": 304545043,
+    "supervised": 282834368,
+    "eligible_anchors": 282759501
+   }
+  },
+  "node1": {
+   "heldout": {
+    "jobs": 134,
+    "items": 134,
+    "tokens": 7816574,
+    "supervised": 5410856,
+    "eligible_anchors": 5408419
+   },
+   "train": {
+    "jobs": 17912,
+    "items": 4478,
+    "tokens": 1095619720,
+    "supervised": 796331132,
+    "eligible_anchors": 796061912
+   }
+  },
+  "agentic": {
+   "heldout": {
+    "jobs": 113,
+    "items": 113,
+    "tokens": 3135145,
+    "supervised": 1599007,
+    "eligible_anchors": 1598381
+   },
+   "train": {
+    "jobs": 43522,
+    "items": 43522,
+    "tokens": 1247111928,
+    "supervised": 637383283,
+    "eligible_anchors": 637143575
+   }
+  },
+  "naive": {
+   "heldout": {
+    "jobs": 117,
+    "items": 117,
+    "tokens": 3122964,
+    "supervised": 2189618,
+    "eligible_anchors": 2189056
+   },
+   "train": {
+    "jobs": 37350,
+    "items": 37350,
+    "tokens": 992595245,
+    "supervised": 709087686,
+    "eligible_anchors": 708926051
+   }
+  }
+ },
+ "by_subset": {
+  "nemotron": {
+   "20260907-nemotron-100k-v1": {
+    "heldout": {
+     "jobs": 132,
+     "items": 132,
+     "tokens": 854909,
+     "supervised": 818195,
+     "eligible_anchors": 818063
+    },
+    "train": {
+     "jobs": 14796,
+     "items": 14796,
+     "tokens": 88711948,
+     "supervised": 84478654,
+     "eligible_anchors": 84463858
+    }
+   },
+   "20260908-nemotron-8k-v2": {
+    "heldout": {
+     "jobs": 490,
+     "items": 490,
+     "tokens": 2020219,
+     "supervised": 1873920,
+     "eligible_anchors": 1873430
+    },
+    "train": {
+     "jobs": 49980,
+     "items": 49980,
+     "tokens": 188926803,
+     "supervised": 174271407,
+     "eligible_anchors": 174221427
+    }
+   },
+   "20260908-nemotron-short4k-v1": {
+    "heldout": {
+     "jobs": 87,
+     "items": 87,
+     "tokens": 231119,
+     "supervised": 208306,
+     "eligible_anchors": 208219
+    },
+    "train": {
+     "jobs": 10091,
+     "items": 10091,
+     "tokens": 26906292,
+     "supervised": 24084307,
+     "eligible_anchors": 24074216
+    }
+   }
+  },
+  "node1": {
+   "training1000": {
+    "heldout": {
+     "jobs": 86,
+     "items": 86,
+     "tokens": 3237297,
+     "supervised": 2385580,
+     "eligible_anchors": 2384620
+    },
+    "train": {
+     "jobs": 3780,
+     "items": 945,
+     "tokens": 86024680,
+     "supervised": 55952972,
+     "eligible_anchors": 55919644
+    }
+   },
+   "arc3": {
+    "heldout": {
+     "jobs": 48,
+     "items": 48,
+     "tokens": 4579277,
+     "supervised": 3025276,
+     "eligible_anchors": 3023799
+    },
+    "train": {
+     "jobs": 2360,
+     "items": 590,
+     "tokens": 219828380,
+     "supervised": 144537572,
+     "eligible_anchors": 144470584
+    }
+   },
+   "independent1000": {
+    "train": {
+     "jobs": 7668,
+     "items": 1917,
+     "tokens": 593380548,
+     "supervised": 449817976,
+     "eligible_anchors": 449697408
+    }
+   },
+   "synth108": {
+    "train": {
+     "jobs": 456,
+     "items": 114,
+     "tokens": 18224812,
+     "supervised": 12176360,
+     "eligible_anchors": 12170596
+    }
+   },
+   "nvarc_training": {
+    "train": {
+     "jobs": 3548,
+     "items": 887,
+     "tokens": 173597312,
+     "supervised": 130804672,
+     "eligible_anchors": 130763832
+    }
+   },
+   "probe": {
+    "train": {
+     "jobs": 40,
+     "items": 10,
+     "tokens": 6592,
+     "supervised": 2776,
+     "eligible_anchors": 2704
+    }
+   },
+   "smoke": {
+    "train": {
+     "jobs": 60,
+     "items": 15,
+     "tokens": 4557396,
+     "supervised": 3038804,
+     "eligible_anchors": 3037144
+    }
+   }
+  },
+  "agentic": {
+   "nvarc_training": {
+    "heldout": {
+     "jobs": 113,
+     "items": 113,
+     "tokens": 3135145,
+     "supervised": 1599007,
+     "eligible_anchors": 1598381
+    },
+    "train": {
+     "jobs": 27106,
+     "items": 27106,
+     "tokens": 781370097,
+     "supervised": 399670038,
+     "eligible_anchors": 399516589
+    }
+   },
+   "nvarc_full": {
+    "train": {
+     "jobs": 16416,
+     "items": 16416,
+     "tokens": 465741831,
+     "supervised": 237713245,
+     "eligible_anchors": 237626986
+    }
+   }
+  },
+  "naive": {
+   "cot": {
+    "heldout": {
+     "jobs": 29,
+     "items": 29,
+     "tokens": 818114,
+     "supervised": 639406,
+     "eligible_anchors": 639377
+    },
+    "train": {
+     "jobs": 9460,
+     "items": 9460,
+     "tokens": 297687581,
+     "supervised": 245696901,
+     "eligible_anchors": 245687441
+    }
+   },
+   "tir": {
+    "heldout": {
+     "jobs": 88,
+     "items": 88,
+     "tokens": 2304850,
+     "supervised": 1550212,
+     "eligible_anchors": 1549679
+    },
+    "train": {
+     "jobs": 27890,
+     "items": 27890,
+     "tokens": 694907664,
+     "supervised": 463390785,
+     "eligible_anchors": 463238610
+    }
+   }
+  }
+ },
+ "sources": {
+  "node1": {
+   "items": 4639,
+   "tokens": 282570026,
+   "supervised": 205138085,
+   "eligible_anchors": 205068155,
+   "kept_round_tokens": 0,
+   "gen_spans": 69930,
+   "stop_substituted": 0,
+   "rewound_gen_tokens": 21106
+  },
+  "agentic": {
+   "items": 125711,
+   "tokens": 3600921669,
+   "supervised": 1845379371,
+   "eligible_anchors": 1844684578,
+   "kept_round_tokens": 678839659,
+   "kept_rounds": 200703,
+   "assistant_turns": 895496,
+   "cut_turns": 52641
+  },
+  "naive": {
+   "items": 47335,
+   "tokens": 1259564567,
+   "supervised": 899745006,
+   "eligible_anchors": 899539692,
+   "kept_round_tokens": 0,
+   "assistant_turns": 205314,
+   "cut_turns": 11891
+  },
+  "nemotron": {
+   "items": 300010,
+   "tokens": 1225293697,
+   "supervised": 1138209504,
+   "eligible_anchors": 1137909494,
+   "kept_round_tokens": 0,
+   "assistant_turns": 300010,
+   "cut_turns": 57868
+  }
+ },
+ "skipped": {
+  "node1": {
+   "few_supervised": 6,
+   "heldout_elsewhere": 21
+  },
+  "agentic": {
+   "heldout_unsampled": 858
+  },
+  "naive": {
+   "heldout_unsampled": 502
+  }
+ },
+ "skipped_tokens": {
+  "node1": {
+   "few_supervised": 1272,
+   "heldout_elsewhere": 847250
+  },
+  "agentic": {
+   "heldout_unsampled": 25022660
+  },
+  "naive": {
+   "heldout_unsampled": 13429144
+  }
+ },
+ "groups": {
+  "agentic/nvarc_full": 120,
+  "agentic/nvarc_training": 713,
+  "node1/arc3": 25,
+  "node1/independent1000": 1000,
+  "node1/nvarc_training": 716,
+  "node1/probe": 16,
+  "node1/smoke": 6,
+  "node1/synth108": 105,
+  "node1/training1000": 1000,
+  "naive/cot": 713,
+  "naive/tir": 716,
+  "nemotron/20260907-nemotron-100k-v1": 59553,
+  "nemotron/20260908-nemotron-8k-v2": 200004,
+  "nemotron/20260908-nemotron-short4k-v1": 40453
+ },
+ "heldout": {
+  "agentic/nvarc": {
+   "tokens_target": 3000000.0,
+   "parents": 8,
+   "per_parent_target": 375000.0,
+   "joint_with": [
+    "naive/nvarc"
+   ],
+   "items": 113,
+   "per_parent_tokens": [
+    382610,
+    393319,
+    393399,
+    396050,
+    393757,
+    397996,
+    388838,
+    389176
+   ],
+   "family_tokens": 28157805,
+   "groups": 8,
+   "eligible_groups": 713,
+   "tokens": 3135145
+  },
+  "naive/nvarc": {
+   "tokens_target": 3000000.0,
+   "parents": 8,
+   "per_parent_target": 375000.0,
+   "joint_with": [
+    "agentic/nvarc"
+   ],
+   "items": 117,
+   "per_parent_tokens": [
+    394080,
+    405441,
+    377302,
+    396977,
+    393234,
+    382743,
+    385358,
+    387829
+   ],
+   "family_tokens": 16552108,
+   "groups": 8,
+   "eligible_groups": 716,
+   "tokens": 3122964
+  },
+  "node1/arc2": {
+   "tokens_target": 3000000.0,
+   "last_score": 0.30424548429839726,
+   "without_family": 284,
+   "groups": 77,
+   "eligible_groups": 1000,
+   "tokens": 3237297
+  },
+  "node1/arc3": {
+   "games": 2,
+   "groups": 2,
+   "eligible_groups": 25,
+   "tokens": 4579277
+  },
+  "nemotron/nemotron": {
+   "split_for_key_permyriad": 23,
+   "groups": 709,
+   "eligible_groups": 300010,
+   "tokens": 3106247
+  }
+ }
+}

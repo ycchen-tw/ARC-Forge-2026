@@ -1,0 +1,37 @@
+{
+  "complete": true,
+  "files": [
+    "layer-0.safetensors",
+    "layer-1.safetensors",
+    "layer-2.safetensors",
+    "layer-3.safetensors",
+    "layer-4.safetensors",
+    "layer-5.safetensors",
+    "layer-6.safetensors",
+    "layer-7.safetensors",
+    "interface.safetensors"
+  ],
+  "kind": "layer-expansion",
+  "dtype": "bfloat16",
+  "source": "$ARC_RUNS/qwen38fn_dflash/20261019-plain-inject-codex1015/exports/step-8251-bf16",
+  "source_manifest_sha256": "904a97a06315ea64b1f1b32c995a9f68edbede9b63e133475275bdcda94d9eb8",
+  "source_config_sha256": "b2d3d781664690db140a0510c83dc49867c4318441719013f8e668fa3c4ea36f",
+  "order": [
+    0,
+    1,
+    2,
+    3,
+    1,
+    2,
+    3,
+    4
+  ],
+  "zero_repeats": false,
+  "repeats": [
+    4,
+    5,
+    6
+  ],
+  "zeroed": [],
+  "converter_sha256": "2774fc7662c007bea202657855ec670969856e516e60596ac066b08f2158a789"
+}

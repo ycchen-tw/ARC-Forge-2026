@@ -1,0 +1,18 @@
+{
+  "method": "gEAN",
+  "formula": "sum gate * expert_output_norm",
+  "mask_sha256": "5757e97501b6a2b9db70e2969e05bf7e1a3f41508c4ac8dc7dd0632a146ef669",
+  "source_branch": "qwen38fn-reap-mm",
+  "source_commit": "986927c09c2fc94d562c4f9f238f47019f99b739",
+  "arc2_sources": [
+    "training1000",
+    "nvarc_training"
+  ],
+  "arc3_public25_split": "A",
+  "arc3_public25_games": 12,
+  "arc3_public25_tainted": true,
+  "selection_recomputed": false,
+  "top_k": 10,
+  "router_renorm": "standard",
+  "gain": 1
+}

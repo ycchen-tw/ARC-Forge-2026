@@ -1,0 +1,51 @@
+{
+ "format": "qad-topk-v1",
+ "k": 32,
+ "distribution": "raw_t1",
+ "tail": "log(1 - sum exp(top-k lp))",
+ "flag_bits": {
+  "1": "hard mask (forced token / grammar cut)",
+  "2": "penalty or min_new_tokens",
+  "4": "logit_bias",
+  "8": "grammar",
+  "16": "think-budget partial mask",
+  "32": "custom logit processor"
+ },
+ "data_dir": "$ARC_RAM_RUNS/tito/20261022-int3-qad-collect/qadmix-1019-1022",
+ "splits": {
+  "train": {
+   "rows": 20200,
+   "positions": 722931963,
+   "index_sha256": "12782cb7511c128a28902645b3e9f224fdde57c1d9b8f24b607ad0284178320d",
+   "loss_mask_sha256": "ee43e6b64cf0028ea98b590f7acb3401be3259c77cd01ebdd82c531c7345b6be"
+  },
+  "validation": {
+   "rows": 374,
+   "positions": 14400806,
+   "index_sha256": "729ceb72c7c6d73820f1332e6ed94a633da46057154ca964fa75022c1501e2ab",
+   "loss_mask_sha256": "2df26cc7fe40bc3832d497270ba36107a10ca6501ca89395758442c2459fc66a"
+  }
+ },
+ "source": "trainer-prefill",
+ "teacher": "$ARC_NFS/models/Qwen3.8-Flash-Next-FP8",
+ "limit_rows": 0,
+ "loading": {
+  "load_seconds": 276.56960562989116,
+  "scales": {
+   "expert_tensors_loaded": 147456,
+   "dense_tensors_loaded": 1070,
+   "expert_storage": "float8_e4m3fn",
+   "full_bf16_weight_copies": 0,
+   "persistent_transposed_weight_copies": 0,
+   "ple_storage": "float8_e4m3fn",
+   "ple_codec": "fp8",
+   "ple_local_weight_bytes": 12800061440,
+   "ple_fp8_local_weight_bytes": 12800061440,
+   "ple_rows": 320001536
+  },
+  "ple_scale": 0.00019931793212890625,
+  "visual_tensors_loaded_bitwise": 333,
+  "base_storage": "fp8"
+ },
+ "created_unix": 1792677484.7570488
+}

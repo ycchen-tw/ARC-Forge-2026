@@ -1,0 +1,67 @@
+{
+  "notebook_sha256": "4738fa3a764817442f94049823a9ee24a21ef3e205d78eeb25ce0cd5b1b84ef2",
+  "scope": "original embedded ARC2 source; work/agentic_tir/agentic_tir.py carries the v15 patch (patched_from_sha256 = audited original)",
+  "files": {
+    "src/arcforge/tir/__init__.py": {
+      "cell": 3,
+      "sha256": "f9071c6ee2c49f7103c096a2c87b7f6045ad1c2d3eb9adc4cdd304cec256f800",
+      "bytes": 756,
+      "characters": 488
+    },
+    "src/arcforge/tir/protocol.py": {
+      "cell": 4,
+      "sha256": "ed5fdc9dcc92ffc460962e44569473315c247234f15d917c4cd488ec8a15ceb1",
+      "bytes": 2482,
+      "characters": 2202
+    },
+    "src/arcforge/tir/parsing.py": {
+      "cell": 5,
+      "sha256": "ecdb2d147e00818f7fa75c8fd0d2537309c67d703f771176860b058d7af0d594",
+      "bytes": 5097,
+      "characters": 5097
+    },
+    "src/arcforge/tir/sandbox.py": {
+      "cell": 6,
+      "sha256": "4ca6caaab9992efee1db030a45b865ea7668b76f8156c532917bf9609bd6f936",
+      "bytes": 17235,
+      "characters": 17121
+    },
+    "src/arcforge/tir/driver.py": {
+      "cell": 7,
+      "sha256": "35dd1775176ecf87a36ae0c1e5a7e59e9f095298037ea4325ffb6111e06c0408",
+      "bytes": 17774,
+      "characters": 14920
+    },
+    "src/arcforge/tir/submission.py": {
+      "cell": 8,
+      "sha256": "f6d90cd28ac2d872c5899e52705b3a0e20c853994a1729c74d716f9ce4ea80f0",
+      "bytes": 3441,
+      "characters": 2879
+    },
+    "src/arcforge/tir/tir_config.json": {
+      "cell": 9,
+      "sha256": "4e635a0f64555361cede3d94752700481b232807c38bd4b9c7adff4817df7e89",
+      "bytes": 3034,
+      "characters": 3034
+    },
+    "work/agentic_tir/prompts.py": {
+      "cell": 10,
+      "sha256": "2c719a202f1126ddc38b8a6e439f112c0a87f5a755f0aa12c07b1de1ef30d172",
+      "bytes": 42801,
+      "characters": 40621
+    },
+    "work/agentic_tir/agentic_tir.py": {
+      "cell": 11,
+      "sha256": "d62aaad196af4f19f456803f5e1feb2f560287d16ba48905c2b679afa86e23a9",
+      "bytes": 124298,
+      "characters": 111597,
+      "patch": "v15: --deadline-rate-adaptive, --time-aware-budget (see README)",
+      "patched_from_sha256": "f986e798df7f632ce34c3405bead39c9088ae3a9cad82ac836ca12ed082c355f"
+    },
+    "src/arcforge/__init__.py": {
+      "cell": 1,
+      "sha256": "665e7b31ed3b983bb41897cf5704c12c09b8703cb7c39e88d798e5ad04be1afa",
+      "bytes": 58
+    }
+  }
+}

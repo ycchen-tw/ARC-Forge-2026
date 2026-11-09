@@ -1,0 +1,6 @@
+#!/bin/bash
+# Copy to env/local.sh and point these at your machine.
+export ARC_DATA="${ARC_DATA:-$ARC_ROOT/data}"            # datasets (ARC tasks, collected trajectories)
+export ARC_MODELS="${ARC_MODELS:-/path/to/models}"       # model checkpoints (base, pruned, quantized, drafters)
+export ARC_RUNS="${ARC_RUNS:-/path/to/runs}"             # run outputs: $ARC_RUNS/<unit>/<YYYYMMDD-tag>/
+export ARC_SGLANG_FORK="${ARC_SGLANG_FORK:-/path/to/sglang-arc-2026}"   # checkout of github.com/ycchen-tw/sglang-arc-2026

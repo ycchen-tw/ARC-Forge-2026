@@ -1,0 +1,5 @@
+{
+  "files": {"lib/arc.py": {"from": "arc.py", "mode": "644"}},
+  "brief": "`lib/arc.py` is already in your workspace",
+  "act": ["anim", "shift", "view"]
+}

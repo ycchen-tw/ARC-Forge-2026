@@ -1,0 +1,6 @@
+# whole sglang package per arm (every file but __pycache__ and _version.py), from g4_runtime.py tree-write;
+# patches= is sha256 over the arm's patch files: a patch change without a rewrite fails the CPU test
+# hisparse = 0001-0032 + h01-h30, the L4 tree digested with symlinks stored as files (sglang-arc-2 deploy/l4-r9r2 at
+# its h30 commit 33e3bf44); frozen: every newer sglang change is a commit in the fork (deploy/sglang.lock.json)
+base 3cd23d5a61a26e13531d8a39a97e110e14d20b06d328a506f5331bce80a74622 files=4892 patches=0c085fdaaf0acbcc6ebdf1f6884a6f6bb0c24cfa4772aba63e65de387076c223
+hisparse 2b3997fd200d328ece4a776962421c200a2e0aa8382b060788fb54275fbff456 files=4901 patches=44c26ca1b04f93954ea5bc197ad9ba208b73e235e8fffabd468efb0661e4194c

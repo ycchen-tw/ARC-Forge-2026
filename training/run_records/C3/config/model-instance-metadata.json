@@ -1,0 +1,13 @@
+{
+  "ownerSlug": "threerabbits",
+  "modelSlug": "qwen38fn-int3-arc2r4-v30-patch",
+  "instanceSlug": "default",
+  "framework": "transformers",
+  "overview": "Weight patch (516 changed tensors in 5 patch safetensors + patch.json + deploy_manifest.json) of ARC2 RL r4 weight version 30 over qwen38fn-gean320-int3-gptq v3 (QAD v3).",
+  "usage": "# Model Format\n\n5 safetensors (patch-model-00001/00002/00011/00017/00018, 3.35 GB) holding only changed tensors, patch.json, deploy_manifest.json. No config.json.\n\n# Model Usage\n\nMount next to threerabbits/qwen38fn-gean320-int3-gptq/Transformers/default/3; the AGI-2 L4 notebook checks patch.json against the pinned base and the v16_patch sitecustomize (ARC_L4_WEIGHT_PATCH) replaces the tensors at load, each checked against its sha256.\n\n# Changelog\n\nv1: RL run 20261029-arc2r4-ctx64k90v2-qadR-tp1x3-b40k-c64k-alltests-g24b576-lr1e-4 merged v000030 (node1, 2026-10-29); patch built 2026-10-29 on node1, patch_sha256 13ed5368025cab375879dcf1cd912e33615d827535c03f6f2ebf4c66a879ec53.",
+  "licenseName": "Other (specified in description)",
+  "fineTunable": false,
+  "trainingData": [],
+  "modelInstanceType": "unspecified",
+  "externalBaseModelUrl": ""
+}

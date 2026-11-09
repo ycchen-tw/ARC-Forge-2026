@@ -1,0 +1,34 @@
+#!/bin/bash
+# Copy to env/local.sh and point these at your machine. The two 8×B200 nodes (node1, node2) set the
+# same variables in their machine files; the comments say what each one held there.
+export ARC_DATA="${ARC_DATA:-$ARC_ROOT/data}"            # datasets: ARC task pools, collected trajectories, seed sets
+export ARC_MODELS="${ARC_MODELS:-/path/to/models}"       # model checkpoints (base, pruned, quantized, drafters)
+export ARC_RUNS="${ARC_RUNS:-/path/to/runs}"             # run outputs: $ARC_RUNS/<unit>/<YYYYMMDD-tag>/
+export ARC_RAM_RUNS="${ARC_RAM_RUNS:-/dev/shm/uid-$UID/arcforge-runs}"   # tmpfs run root (ledgers, RL batches)
+export ARC_NFS="${ARC_NFS:-/path/to/nfs-archive}"        # shared NFS archive that mirrors runs/, data/ and models/
+
+# sglang: the fork checkout (github.com/ycchen-tw/sglang-arc-2026, tags in training/README.md),
+# the venv that serves it (sglang 0.5.20 build), and the patched upstream checkout some serving arms use.
+export ARC_SGLANG_FORK="${ARC_SGLANG_FORK:-/path/to/sglang-arc-2026}"
+export ARC_SGLANG_VENV="${ARC_SGLANG_VENV:-/path/to/venv-0520}"
+export ARC_SGLANG_SRC="${ARC_SGLANG_SRC:-/path/to/sglang-qwen4}"
+
+# codex CLI 0.154.0 builds (runtime/ builds them): p7 for most harnesses, p8 for the ARC-AGI-3 RL
+# harness and selftest; the ARC-AGI-2 jail wrapper prefix.
+export ARC_CODEX_PREFIX="${ARC_CODEX_PREFIX:-/path/to/codex-0.154.0-p7/prefix}"
+export ARC_CODEX_P8_PREFIX="${ARC_CODEX_P8_PREFIX:-/path/to/codex-0.154.0-p8/prefix}"
+export ARC2_JAIL_PREFIX="${ARC2_JAIL_PREFIX:-/path/to/codex-0.154.0-p7/arc2-jail}"
+
+# ARC-AGI-3: the canonical game corpus (its baseline_actions enter the score), and the Python
+# runtime the agent runs in (python3.12 venv with the competition wheels + scipy 1.18.1).
+export ARC_ARC3_CORPUS="${ARC_ARC3_CORPUS:-/path/to/environment_files}"
+export ARC_AGENT_RUNTIME="${ARC_AGENT_RUNTIME:-$ARC_RUNS/arc_code/agent-runtime-scipy}"
+
+export ARC_FFMPEG="${ARC_FFMPEG:-/path/to/ffmpeg}"       # ffmpeg 8.1 build (work/qwen38fn_eval/setup_ffmpeg.sh)
+export ARC_BENCH_MODEL="${ARC_BENCH_MODEL:-/path/to/Qwen3.8-Flash-Next-FP8}"   # FP8 512-expert model for bench / teacher runs
+export ARC_BENCH_MIN_FREE_GB="${ARC_BENCH_MIN_FREE_GB:-80}"
+
+# Set on the B200 hosts as well.
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export FLASH_ATTENTION_CUTE_DSL_CACHE_ENABLED=1
+export CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"

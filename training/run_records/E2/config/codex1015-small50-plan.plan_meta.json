@@ -1,0 +1,151 @@
+{
+ "version": 1,
+ "created": "2026-10-18T16:12:52+00:00",
+ "argv": [
+  "work/qwen38fn_dflash/make_data_plan.py",
+  "--out",
+  "$ARC_RUNS/qwen38fn_dflash/20261019-codex1015-small50-plan",
+  "--target-profile",
+  "$ARC_RUNS/qwen38fn_dflash/20261017-int3-target-profile/profile-int3-w3a8-tp1.json",
+  "--seed",
+  "0",
+  "--codex1015",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184",
+  "--fraction",
+  "arc2=0.1",
+  "arc3=0.1",
+  "--passes",
+  "arc2=1",
+  "arc3=1",
+  "--context-length",
+  "220000",
+  "--codex-heldout",
+  "arc2/arc2=2x2",
+  "arc3/comm-A=2x2",
+  "arc3/off25=1x2",
+  "--workers",
+  "4"
+ ],
+ "code": {
+  "commit": "527f8e284182854e4017b1549d10f65a25d2c0e4",
+  "dirty": true
+ },
+ "seed": 0,
+ "context_length": 220000,
+ "block_size": 8,
+ "anchor_rule": "a >= 1 and mask[a] and mask[a + 1]",
+ "min_supervised": 7,
+ "heldout_tokens": 3000000.0,
+ "heldout_salt": "dflash-data-plan-v1",
+ "arc3_heldout_games": 2,
+ "heldout_parents": 8,
+ "image_detail": "high",
+ "codex_heldout": {
+  "arc2/arc2": {
+   "groups": 2,
+   "items_per_group": 2
+  },
+  "arc3/comm-A": {
+   "groups": 2,
+   "items_per_group": 2
+  },
+  "arc3/off25": {
+   "groups": 1,
+   "items_per_group": 2
+  }
+ },
+ "codex_heldout_groups": [],
+ "known_approximations": [
+  "codex1015: think-budget-forced tokens stay supervised (not sampled; 436 of 185M arc3 tokens where the ledger kept flags)"
+ ],
+ "corpora": {
+  "arc2": {
+   "fraction": 0.1,
+   "passes": 1,
+   "sources": [
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184"
+   ]
+  },
+  "arc3": {
+   "fraction": 0.1,
+   "passes": 1,
+   "sources": [
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184"
+   ]
+  }
+ },
+ "target_profile": {
+  "path": "$ARC_RUNS/qwen38fn_dflash/20261017-int3-target-profile/profile-int3-w3a8-tp1.json",
+  "instance": "node1-p31749-20261017T094258-1018307",
+  "sha256": "79c05febb562d17ef39616266f76d99a04977729ea7bb36fbb51b0c1b9afbdde",
+  "served_model_name": "dflash-capture.node1-p31749-20261017T094258-1018307.79c05febb562d17e",
+  "model_path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/qwen38fn-gean320-int3-gptq"
+ },
+ "tokenizer": {
+  "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/qwen38fn-gean320-int3-gptq/tokenizer.json",
+  "sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3"
+ },
+ "tito_instances": [
+  {
+   "name": "node1-p30811-20261015T032003-3677178",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+   "kind": "codex1015",
+   "server_json_sha256": "cb8bfd269baca748c8377c6017f139dcb124d25510791f8a6d08780aca31d689"
+  },
+  {
+   "name": "node1-p30812-20261015T032000-3677184",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184",
+   "kind": "codex1015",
+   "server_json_sha256": "e8e0f2f196bb27c6955f5e7cc8e6ed01f43e0504d095ebdddd22e3f10da40fa8"
+  }
+ ],
+ "sources": [],
+ "heldout": {
+  "arc2/arc2": {
+   "groups_rule": 2,
+   "items_per_group": 2,
+   "forced": [],
+   "items": 4,
+   "tokens": 240497,
+   "group_tokens": 274277,
+   "groups": 2,
+   "eligible_groups": 146,
+   "group_list": [
+    "independent1000:ind_0260",
+    "independent1000:ind_0261"
+   ]
+  },
+  "arc3/comm-A": {
+   "groups_rule": 2,
+   "items_per_group": 2,
+   "forced": [],
+   "items": 3,
+   "tokens": 196612,
+   "group_tokens": 292633,
+   "groups": 2,
+   "eligible_groups": 125,
+   "group_list": [
+    "arc3:gu68",
+    "arc3:wa13"
+   ]
+  },
+  "arc3/off25": {
+   "groups_rule": 1,
+   "items_per_group": 2,
+   "forced": [],
+   "items": 2,
+   "tokens": 117907,
+   "group_tokens": 226521,
+   "groups": 1,
+   "eligible_groups": 25,
+   "group_list": [
+    "arc3:tn36"
+   ]
+  }
+ },
+ "plan_sha256": "267da19bee164a900fcb977fa6eb4214d66a9e7cee464505d0ea9bc5cc80615b",
+ "jobs": 65
+}

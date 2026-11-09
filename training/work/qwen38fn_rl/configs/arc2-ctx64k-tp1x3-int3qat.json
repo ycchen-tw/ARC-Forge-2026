@@ -1,0 +1,114 @@
+{
+ "schema_version": 1,
+ "run_root": "$ARC_RUNS/qwen38fn_rl/<set by configure_b200.py>",
+ "seed": 20261007,
+ "rounds": 20,
+ "tokenizer_dir": "$ARC_RAM_RUNS/../models/qwen38fn-gean320-int3-gptq",
+ "poll_seconds": 5,
+ "min_free_gb": 40,
+ "disk_guard_paths": [
+  "$ARC_RUNS",
+  "$ARC_RAM_RUNS"
+ ],
+ "legacy_sync": false,
+ "pipeline": "stream",
+ "retention": {
+  "keep_merged": 2,
+  "drop_batch_payload": true
+ },
+ "stream": {
+  "group_size": 8,
+  "max_groups_in_flight": 8,
+  "max_pooled_groups": 128,
+  "batch_live_episodes": 32,
+  "max_staleness": 8,
+  "group_timeout_seconds": 18000,
+  "eval_keep_every": 0,
+  "hard_min_free_gb": 25,
+  "end_margin": 1.15,
+  "quarantine": {
+   "same_signature_max": 3,
+   "same_signature_seconds": 3600,
+   "max_fraction": 0.05,
+   "fraction_window_groups": 100,
+   "fraction_min_groups": 20
+  }
+ },
+ "rollout": {
+  "base_url": "http://127.0.0.1:30570/v1",
+  "served_name": "qwen38fn",
+  "idle_timeout_seconds": 180,
+  "ledger_drain_timeout_seconds": 300,
+  "sync_timeout_seconds": 1800,
+  "replica_urls": [
+   "http://127.0.0.1:30571/v1",
+   "http://127.0.0.1:30572/v1",
+   "http://127.0.0.1:30573/v1",
+   "http://127.0.0.1:30574/v1"
+  ],
+  "trainer_base_path": "$ARC_RAM_RUNS/../models/qwen38fn-gean320-int3-bf16dense"
+ },
+ "trainer": {
+  "endpoint_file": "$ARC_RUNS/qwen38fn_rl/<set by configure_b200.py>/trainer/trainer_endpoint.json",
+  "train_timeout_seconds": 3600,
+  "publish_timeout_seconds": 1800,
+  "save_every_rounds": 5
+ },
+ "harness": {
+  "script": "work/arc_code/arc2/run_arc2.py",
+  "agent_python": "$ARC_AGENT_RUNTIME/bin/python",
+  "driver_bin": "$ARC_CODEX_PREFIX",
+  "config": "work/qwen38fn_rl/configs/harness-b40k-c64k-v3y-alltests-group.json",
+  "launch_stagger_seconds": 2,
+  "terminate_grace_seconds": 600
+ },
+ "tasks": {
+  "train": {
+   "dir": "<set by configure_b200.py>",
+   "ids_file": "<set by configure_b200.py>",
+   "shuffle": false
+  },
+  "heldout": {
+   "dir": "<set by configure_b200.py>",
+   "ids_file": "<set by configure_b200.py>"
+  }
+ },
+ "audit": {
+  "command": [
+   "$ARC_SGLANG_VENV/bin/python",
+   "-m",
+   "arcforge.tito"
+  ],
+  "whitelist": [],
+  "allow_budget_truncation": true,
+  "allow_splits": {
+   "text_differs": 64
+  },
+  "per_run": false,
+  "timeout_seconds": 3600
+ },
+ "prepare": {
+  "command": [
+   "env",
+   "MEDIA_DEVICE=cuda",
+   "CUDA_VISIBLE_DEVICES=GPU-c358b96c-a8c5-1220-914d-68307c81222c",
+   "ARC_SGLANG_FORK=$HOME/work/sglang-arc-2-rl-int3",
+   "bash",
+   "work/qwen38fn_lora/prepare_rl.sh",
+   "--workers",
+   "4"
+  ],
+  "timeout_seconds": 7200,
+  "temperature": 0.7,
+  "minibatches": 1,
+  "world": 3,
+  "bin_tokens": 200000,
+  "eps": 0.1,
+  "cap": 3.0,
+  "eps_low": 0.2,
+  "eps_high": 0.28,
+  "weight_version_recorded": true,
+  "max_gb": 10,
+  "reserve_gb": 20
+ }
+}

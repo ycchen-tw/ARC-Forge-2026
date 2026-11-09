@@ -1,0 +1,5 @@
+# A1 run record: TITO ledger collection on node1
+Host node1, 2026-10-05 20:54Z to 2026-10-06 03:45Z. Servers: `launch/launch_server.sh a 0,1,2,3 30241` and `launch/launch_server.sh b 4,5,6,7 30242` (FP8 TP4 + MTP, sglang-arc-2 fork 5c99db5c, not in this tree); `config/p30241.server.json` / `config/p30242.server.json` hold the full server_args.
+Main command lines: `launch/lane.sh` (run_arc2.py for arc2, run_arm.py for arc3). Lanes arc2-a, arc2-a2, arc2-a3 and arc3 (`launch/chain_arc3.sh`, rounds run-01 and run-02) used :30241; arc2-b1 to arc2-b5 used :30242. codex 0.154.0-p7 (Kaggle dataset threerabbits/arcforge-codex-0154-p7) ran inside `launch/arc2-jail-codex.sh`.
+Inputs: `lists/arc2_batches.tsv` (pool and task ids of the 71 arc2 batches; training1000 = arcprize/ARC-AGI-2 @f3283f72 data/training, nvarc_training converted by `code/build_nvarc_pool.py` from Kaggle sorokin/nvarc-synthetic-puzzles, independent1000 and synth108 from work/seed_bank); arc3 used the public-25 corpus with fingerprint 72fe9ffcd98ba3af.
+Output: $ARC_NFS/runs/tito/20261006-node1-collect/ledger (one instance per server).

@@ -1,0 +1,100 @@
+diff --git a/codex-rs/core/src/session/turn.rs b/codex-rs/core/src/session/turn.rs
+index e9a1a03..4f10a1b 100644
+--- a/codex-rs/core/src/session/turn.rs
++++ b/codex-rs/core/src/session/turn.rs
+@@ -506,8 +506,19 @@ pub(crate) async fn run_turn(
+                     );
+                 }
+ 
++                let external_request = needs_follow_up
++                    && turn_context
++                        .config
++                        .features
++                        .enabled(Feature::ExternalCompactRequest)
++                    && take_external_compact_request(
++                        &turn_context.config.codex_home,
++                        token_status.active_context_tokens,
++                    );
+                 let should_roll_over = needs_follow_up
+-                    && (sess.take_new_context_window_request().await || token_limit_reached);
++                    && (sess.take_new_context_window_request().await
++                        || token_limit_reached
++                        || external_request);
+                 let allow_auto_compact_fallback = !should_roll_over && !token_limit_reached;
+                 super::token_budget::maybe_record(
+                     sess.as_ref(),
+@@ -1244,6 +1255,48 @@ async fn maybe_run_previous_model_inline_compact(
+     Ok(())
+ }
+ 
++/// `features.external_compact_request`: a harness asks for a compaction by creating
++/// `$CODEX_HOME/compact_request`. The file may hold a token count; below it the request is
++/// dropped (an early, small context is not worth summarising). Either way the file is consumed
++/// here, at a point where the turn can roll over into a new window.
++fn take_external_compact_request(
++    codex_home: &codex_utils_absolute_path::AbsolutePathBuf,
++    active_context_tokens: i64,
++) -> bool {
++    let path = codex_home.join("compact_request");
++    let text = match std::fs::read_to_string(&path) {
++        Ok(text) => text,
++        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return false,
++        Err(err) => {
++            error!("external compact request {}: {err}", path.display());
++            return false;
++        }
++    };
++    if let Err(err) = std::fs::remove_file(&path) {
++        error!(
++            "cannot consume external compact request {}: {err}",
++            path.display()
++        );
++        return false;
++    }
++    let min_tokens = match text.trim() {
++        "" => 0,
++        value => match value.parse::<i64>() {
++            Ok(tokens) => tokens,
++            Err(err) => {
++                error!(
++                    "external compact request {}: {value:?} is not a token count ({err}); compacting",
++                    path.display()
++                );
++                0
++            }
++        },
++    };
++    let accepted = active_context_tokens >= min_tokens;
++    info!(active_context_tokens, min_tokens, accepted, "external compact request");
++    accepted
++}
++
+ #[instrument(
+     level = "trace",
+     skip_all,
+diff --git a/codex-rs/features/src/lib.rs b/codex-rs/features/src/lib.rs
+index 3afb104..f80b285 100644
+--- a/codex-rs/features/src/lib.rs
++++ b/codex-rs/features/src/lib.rs
+@@ -116,6 +116,8 @@ pub enum Feature {
+     CompactionReusePrefix,
+     /// Drop `<analysis>` scratchpad blocks from a local compaction summary before it is stored.
+     CompactionStripAnalysis,
++    /// Compact at the next turn boundary when a harness has created `$CODEX_HOME/compact_request`.
++    ExternalCompactRequest,
+     /// Record model-attempted tool calls in internal Responses metadata.
+     ExecutedToolCallMetadata,
+     /// Enable JavaScript code mode backed by the standalone host process.
+@@ -1033,6 +1035,12 @@ pub const FEATURES: &[FeatureSpec] = &[
+         stage: Stage::UnderDevelopment,
+         default_enabled: false,
+     },
++    FeatureSpec {
++        id: Feature::ExternalCompactRequest,
++        key: "external_compact_request",
++        stage: Stage::UnderDevelopment,
++        default_enabled: false,
++    },
+     FeatureSpec {
+         id: Feature::ExecutedToolCallMetadata,
+         key: "executed_tool_call_metadata",

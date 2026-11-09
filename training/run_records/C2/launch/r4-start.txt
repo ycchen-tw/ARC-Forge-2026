@@ -1,0 +1,10 @@
+config: $ARC_RUNS/qwen38fn_rl/20261029-arc2r4-ctx64k90v2-qadR-tp1x3-b40k-c64k-alltests-g24b576-lr1e-4/config.json
+ok: 90 train tasks, 60 held-out tasks, run_root $ARC_RUNS/qwen38fn_rl/20261029-arc2r4-ctx64k90v2-qadR-tp1x3-b40k-c64k-alltests-g24b576-lr1e-4
+baseline: 60 tasks x 4 samples, out $ARC_RUNS/qwen38fn_rl/20261029-arc2r4-ctx64k90v2-qadR-tp1x3-b40k-c64k-alltests-g24b576-lr1e-4/baseline-b32k
+fork lock: bdf43e5092a3107a2bc842615c743cfbb13baa3c
+serve profile: perf-main-fp16-ser-opt-lazyfix-l8-a16-topp (lock b200-rl-topp-1024)
+rollout temperature: ARC_RESPONSES_DEFAULT_TEMPERATURE=1.0 ARC_RESPONSES_DEFAULT_TOP_P=0.95 ARC_RESPONSES_DEFAULT_TOP_K=20
+vocab limit: ARC_LOGITS_VOCAB_LIMIT=248077
+drafter: $ARC_RUNS/qwen38fn_rl/dflash-rollout/drafter/planb-l8-s25562/deploy-fp8
+lineage: qwen38fn-qadmix-R-int3-gptq / qwen38fn-qadmix-R-int3-bf16dense: 1580 shared tensors identical (7.6 GiB compared; 144 only served, 0 only trained)
+plan.json has no init: the replicas serve the base

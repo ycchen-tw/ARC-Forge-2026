@@ -1,0 +1,206 @@
+{
+  "date": "2026-10-20",
+  "source_language": "zh-Hant",
+  "language": "en",
+  "source_rule_review_commit": "3eb0127839c496f984115d8ee74457d774d4c534",
+  "scope": "Complete translations of 25 current game pages and four current guides; historical archives and executable probes remain shared.",
+  "semantic_review": "All 25 Chinese/English game pairs read in full by independent Sol reviewers; four guide pairs read by the parent.",
+  "normalizations": "Chinese prose placeholders in pseudocode are translated; real identifiers, numeric quantities, conditions and evidence limits are preserved. Large-number notation is localized, e.g. 12萬 to 120,000.",
+  "limitations": "Translation review does not expand the original rule-verification coverage; static structure/code checks are not a semantic proof.",
+  "review_receipts_sha256": {
+    "qa1": "81a6b16f7f78226d03cfa7fe674ce8a479a084ffff9ea3ed48e323339111c8bc",
+    "qa2": "49e60d8aeb7889ed63361d2ccdd11a7ee865896064a02f95c6ad1ca2728614b5"
+  },
+  "review_receipts": {
+    "qa1": "../results/20261020-english-qa1.json",
+    "qa2": "../results/20261020-english-qa2.json"
+  },
+  "files": [
+    {
+      "source": "README.md",
+      "english": "en/README.md",
+      "source_sha256": "dd4e8baa26dce727e941afe186161cb5b80c5b597a7d0aec28f24097ec30a16e",
+      "english_sha256": "c295ef7c0ace194c171e95882dcd007eea26e7d20f752bd3562d94ec3127e52c"
+    },
+    {
+      "source": "COMMON.md",
+      "english": "en/COMMON.md",
+      "source_sha256": "fe8b6ba8f7b781ea9969863979196714f661e8a83f54435ff11f210ffcc76aa6",
+      "english_sha256": "d88a8f5b929144cf46e2b0f858872996b92e2b02a5f612521c6b9ebe5b821824"
+    },
+    {
+      "source": "REVIEW.md",
+      "english": "en/REVIEW.md",
+      "source_sha256": "1761ae67fe283305107e7ca380fa8c6a86d55c60d51b3c16d39f7f50c28f94df",
+      "english_sha256": "65ab6d71ff0ec2bc65e542f00f36221b94383053eed07ccfa1e1f59a32b100b1"
+    },
+    {
+      "source": "VALIDATION.md",
+      "english": "en/VALIDATION.md",
+      "source_sha256": "b0c0e9290ccf00dd004186376b5281ba9eaa5fbe4f742e955f52f80b5c132f8e",
+      "english_sha256": "9bd15e3374612a8a3b5e868347f56a3fb6cbb1cbadc5a0b8f09e044f066871d5"
+    },
+    {
+      "source": "games/ar25.md",
+      "english": "en/games/ar25.md",
+      "source_sha256": "8ab833f27bb5e02d6d928783ba488d32347995551b8bbfb52ca3f741b9dd6a3e",
+      "english_sha256": "dffd7ba2d18feb30d3a16b4c9c1605f0513f9da012496e91b5cd1c2a7e51bf89"
+    },
+    {
+      "source": "games/bp35.md",
+      "english": "en/games/bp35.md",
+      "source_sha256": "0e83aacdbba37625e891af54ed902921042c69ae14f92e220fe574a394b495bc",
+      "english_sha256": "b14c163549f761eeb13dd9a4998764c7fd4130b8fc8acb02193a476af2452b51"
+    },
+    {
+      "source": "games/cd82.md",
+      "english": "en/games/cd82.md",
+      "source_sha256": "4857119f93801434a66a779265ab719a907866d56507ee66ae24d3cc63a6cc49",
+      "english_sha256": "d92d6e299e03a5242ce90e1e2716b332b883984bc11a22b7397b34963d9f4c5d"
+    },
+    {
+      "source": "games/cn04.md",
+      "english": "en/games/cn04.md",
+      "source_sha256": "35e1d5e14c8c91b087ac17b32506d3b499e6c99431e29f105f9a61aca375eac3",
+      "english_sha256": "3f3289dc382f6903e1a730d50cc36ce18303f07a6a8b3af680fb1134f326b379"
+    },
+    {
+      "source": "games/dc22.md",
+      "english": "en/games/dc22.md",
+      "source_sha256": "6c7ec57d602a2913d618fa9a232864015c40b127d6748925e108c66795eca672",
+      "english_sha256": "a71f20ba333ed887953506b522f2d772f5b3deeff1503903d84eb4a468d6a962"
+    },
+    {
+      "source": "games/ft09.md",
+      "english": "en/games/ft09.md",
+      "source_sha256": "dd7b79535f47bd2b40c94340ab27b26b12c0098548b0ddcae994b263b587916c",
+      "english_sha256": "136d1f51c1bdafb9cb06e9f3dac532d28812fb9487a1b34d1c987eb7dfdfc0f1"
+    },
+    {
+      "source": "games/g50t.md",
+      "english": "en/games/g50t.md",
+      "source_sha256": "3d130c2668426109c03e513c851ebb69e70ed80f524185a85ab905285a998ef0",
+      "english_sha256": "a1a0a6a6f6a8b7b1c1a88d0f4134eb03a67a4420c4a3a98855553ed94c7091f4"
+    },
+    {
+      "source": "games/ka59.md",
+      "english": "en/games/ka59.md",
+      "source_sha256": "a214bce4ac07fd5852d24de4f12f910d32b66107eff8926a2ac3e9bf09692aa7",
+      "english_sha256": "f330ea5310fe6a92532a6a3b20e40f63aa4820c0ffc1551e2ed534d99ff07bfe"
+    },
+    {
+      "source": "games/lf52.md",
+      "english": "en/games/lf52.md",
+      "source_sha256": "fb27d0f6e61346376d4c45117170fcfdbfa0d07f96f71ba0abf83dc0a52e5bca",
+      "english_sha256": "0a78611a623d309ca2cf22dfc2b4dbb3d749912efa739fb4bea580dfa061b40c"
+    },
+    {
+      "source": "games/lp85.md",
+      "english": "en/games/lp85.md",
+      "source_sha256": "639fa2a1734b0c784bbea2c161168ce45bfc6c38306107d581ab8fd18a1137cb",
+      "english_sha256": "70df9c1abc33ccd326b5d59ba4101a77d844a383fb5acacf8a7a01791acb80a1"
+    },
+    {
+      "source": "games/ls20.md",
+      "english": "en/games/ls20.md",
+      "source_sha256": "42fd0193ebdb12a0c82771b916b0a3423753e84b2bca4ecc17bca1c4d5a53913",
+      "english_sha256": "fc3a8c863d5d9345db65036aaf2c2223316c7aa5b00072bf71d8cd7666a9f8f0"
+    },
+    {
+      "source": "games/m0r0.md",
+      "english": "en/games/m0r0.md",
+      "source_sha256": "ce4c2afa8031a2dff4517cb7d4cd1026ec96421f95be9a5bd0cf7d42fce5c1a4",
+      "english_sha256": "2eb88489aa894d945d1a752ea8cf10979e56a48d37df40f8bf037a0f86afcf6f"
+    },
+    {
+      "source": "games/r11l.md",
+      "english": "en/games/r11l.md",
+      "source_sha256": "f7a8eb859cb3a0c6a1f3023770c5c9b55d0bfbb9549cf451042d4111866f14ee",
+      "english_sha256": "0817e99aade14c2661ce0229093d346da28c495f9922bc24c5482ffbf16f49dd"
+    },
+    {
+      "source": "games/re86.md",
+      "english": "en/games/re86.md",
+      "source_sha256": "4036d2979f14e1d3b552c4e2267a46e231f557708da71a9a7528b82c7b27a828",
+      "english_sha256": "17d193dd98c263fdfd032f092d5f7b82964933c9060476122ee2a85ed1e39c39"
+    },
+    {
+      "source": "games/s5i5.md",
+      "english": "en/games/s5i5.md",
+      "source_sha256": "0ba44dd0a782da31db89e8ed2c7aa11bf5d0c5920e6b5b4a2b7b87ef3aa960e9",
+      "english_sha256": "5c069f8746a24ae2f465c179185a8dfeef26153d7b479ffe1f13364ce49bc5ca"
+    },
+    {
+      "source": "games/sb26.md",
+      "english": "en/games/sb26.md",
+      "source_sha256": "404ce1ce24a575716f0d81e4b3628e450748b12876cdf4ff3d673a815b74c3c6",
+      "english_sha256": "36932cf4299aaa75474aa5d1363242c88b04b4969e738eb548a5ef813f29343e"
+    },
+    {
+      "source": "games/sc25.md",
+      "english": "en/games/sc25.md",
+      "source_sha256": "1c76ef6a8dc985bb4e556eba89fa2c60a1e3e6230a3951e58646099c7256610f",
+      "english_sha256": "a14cac9d1170f9970ed85ce4c3ca93370363a014c4f7d0549de53e32c0a725f3"
+    },
+    {
+      "source": "games/sk48.md",
+      "english": "en/games/sk48.md",
+      "source_sha256": "9ea995401cb05a62a3dbc29d5694c0ce330ed9e36bf7f951f717fec60d084c60",
+      "english_sha256": "8925e932d305ff1a3b32e0229a4d58c880b907da387e86bd519b4245345c37df"
+    },
+    {
+      "source": "games/sp80.md",
+      "english": "en/games/sp80.md",
+      "source_sha256": "599a86bf5663a28f5c828e313b6640230a27dda650fca49e6d21a831c18a1e6b",
+      "english_sha256": "572a9789899bae8038736f31197e29b7e60b1e5a6fb2e37f09a5587e1456cead"
+    },
+    {
+      "source": "games/su15.md",
+      "english": "en/games/su15.md",
+      "source_sha256": "db55185d35da0d8095b19c32be6705ea53c672d197aeaab2578c3d0173d4acf8",
+      "english_sha256": "0c63131de289311ea98b69b1db6b67122de5af254bb4e3d26db9b01c9a7b47db"
+    },
+    {
+      "source": "games/tn36.md",
+      "english": "en/games/tn36.md",
+      "source_sha256": "ae21ecae9978502b9b12111f99635a188e2941baa5c4a84fd0eb4a4f07507d53",
+      "english_sha256": "a1d305a5611d84561914c0b74aab0b6c1a04e5fde68b77f9ce03d05609ed97eb"
+    },
+    {
+      "source": "games/tr87.md",
+      "english": "en/games/tr87.md",
+      "source_sha256": "4e8695b099cb61495923443c6b678bcf17a2221d8df76702aef4cb37b52b7776",
+      "english_sha256": "0ffdb7c8fbb6f2a6e6da7cddb15542251439a17d36bd1d67cc29c9b014c5b387"
+    },
+    {
+      "source": "games/tu93.md",
+      "english": "en/games/tu93.md",
+      "source_sha256": "30359dade54e4fe4eb15ad5ed6964e63e55d7b53a014c0c3763c098ec3a0aed0",
+      "english_sha256": "393bdec0983f3b74cf9b5f3fe14dab91810c67b3ad438c5bcb602da984c74870"
+    },
+    {
+      "source": "games/vc33.md",
+      "english": "en/games/vc33.md",
+      "source_sha256": "2d829656ec7d8b2ad087242656a1ea7fdb405a1a94728b0eae30a54f08a64df7",
+      "english_sha256": "94e038376fc6d308413294a62c1fe24f20b6d4e3e538cc976b2aefea065cab34"
+    },
+    {
+      "source": "games/wa30.md",
+      "english": "en/games/wa30.md",
+      "source_sha256": "f7fc1928abbf6f8e5200d9c358900e541bb93dc0218c7ce256defbf9a616b57f",
+      "english_sha256": "3eee6ca711781659a46d80153d694a9f082a120486f17e0b0929b4494b33ce0e"
+    }
+  ],
+  "current_revision_date": "2026-10-22",
+  "amendment_policy": "files and original review receipts retain the2026-10-20 baseline; apply reviewed amendments in order to obtain current hashes.",
+  "amendments": [
+    {
+      "path": "../results/20261022-playtest-amendments.json",
+      "sha256": "4baad53518c2badf23cf2c113d6cf933d71f521616a245c6b413ad683299c3ad"
+    },
+    {
+      "path": "../results/20261022-playtest-r2-amendments.json",
+      "sha256": "bb231f01ab87b41b98119e8832ec06b61f471e69ad217104e6e4d6e9a5830a75"
+    }
+  ]
+}

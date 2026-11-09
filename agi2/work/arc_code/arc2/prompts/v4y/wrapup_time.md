@@ -1,0 +1,5 @@
+Your time for this puzzle is almost up: you have about {minutes} left, and after that you are stopped mid-step. Wrap up now, in this order:
+
+1. If `python3 check.py` does not yet pass every training pair, put the best rule you have into solution.py now -- a rule that passes some training pairs and gives an output for every test input is worth more than none -- and run `python3 check.py` once. If it already passes every training pair, leave solution.py as it is.
+2. Bring REPORT.md up to date (see Report in AGENTS.md), briefly: the rule as you understand it, what you verified, what is derived from the input and what is fixed, the rival readings, and what you still doubt.
+3. Then stop: reply with one short line and no tool call.

@@ -1,0 +1,80 @@
+From 856154394523887f8b545998bba5c7034b06c673 Mon Sep 17 00:00:00 2001
+From: arc <a@b.c>
+Date: Sat, 19 Sep 2026 15:42:26 +0000
+Subject: [PATCH] arc: 0016-ple-side-state-commit-after-replayssm (re-cut of
+ pr36497 0018 onto the 0.5.20 GDN ring branch)
+
+---
+ python/sglang/srt/speculative/spec_utils.py | 49 +++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
+
+diff --git a/python/sglang/srt/speculative/spec_utils.py b/python/sglang/srt/speculative/spec_utils.py
+index 89bc4e2d..f903fb3a 100644
+--- a/python/sglang/srt/speculative/spec_utils.py
++++ b/python/sglang/srt/speculative/spec_utils.py
+@@ -855,6 +855,45 @@ def _verify_commit_step_indices(
+     return last_correct_step_indices, mamba_steps_to_track
+ 
+ 
++def _commit_ple_side_states_after_replayssm(
++    model_runner,
++    req_pool,
++    state_indices: torch.Tensor,
++    last_correct_step_indices: torch.Tensor,
++    mamba_track_indices: Optional[torch.Tensor],
++    mamba_steps_to_track: Optional[torch.Tensor],
++) -> None:
++    """Commit Qwen4-Exp PLE side states after a ReplaySSM spec verify.
++
++    The short-conv window and the n-gram context are written per verify step into
++    their ``intermediate_*`` buffers (including the prefix-cache boundary
++    snapshot). The general path rolls them into the main slots inside
++    ``attn_backend.update_mamba_state_after_mtp_verify``; the ReplaySSM branches
++    return before reaching it, so without this call the PLE state never advances
++    past the verify window -- no error, the outputs just drift.
++
++    Index space: the PLE pools only exist on the static hybrid pool (the unified
++    pool refuses them), whose mamba ids are already physical, so the ids here are
++    the same ones the conv scatter above used. Refuse a virtual-id pool rather
++    than scatter into the wrong slots.
++    """
++    short_conv_pool = req_pool.short_conv_pool
++    ngram_pool = req_pool.ngram_pool
++    if short_conv_pool.conv_state is None and ngram_pool.context is None:
++        return
++    if req_pool.mamba_v2p_table is not None:
++        raise RuntimeError(
++            "PLE side states on a virtual-id mamba pool: state indices would need "
++            "a virtual->physical translate before the commit"
++        )
++    model_runner.attn_backend._update_ple_state_after_mtp_verify(
++        state_indices_tensor=state_indices,
++        last_correct_step_indices=last_correct_step_indices,
++        mamba_track_indices=mamba_track_indices,
++        mamba_steps_to_track=mamba_steps_to_track,
++    )
++
++
+ def commit_mamba_states_after_verify(
+     target_worker: TpModelWorker,
+     batch: ScheduleBatch,
+@@ -992,6 +1031,16 @@ def commit_mamba_states_after_verify(
+                 batch.mamba_track_indices,
+                 mamba_steps_to_track,
+             )
++        # This early return skips attn_backend.update_mamba_state_after_mtp_verify,
++        # which is where the PLE side states get committed on the general path.
++        _commit_ple_side_states_after_replayssm(
++            model_runner,
++            req_pool,
++            state_batch_indices,
++            last_correct_step_indices,
++            batch.mamba_track_indices,
++            mamba_steps_to_track,
++        )
+         return
+ 
+     # KDA ReplaySSM (fold-every-commit): KDA keeps its own recurrent verify kernel
+-- 
+2.43.0
+

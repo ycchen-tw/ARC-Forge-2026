@@ -1,0 +1,1 @@
+2026-10-30T04:31:35+00:00 node2 systemd[5477]: Started rl-v8-trainer.service - /bin/bash work/qwen38fn_lora/train_rl_service.sh.

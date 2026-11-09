@@ -1,0 +1,18 @@
+{
+ "method": "one-shot GPTQ, Humming uint3 g128 no zero point, signed BF16 scales; Hessians from the gEAN320-pruned FP8 forward with experts not yet quantized (no sequential replay), 8 windows x 6 layers replaying the identical 50 segments; no per-expert sample cap; damping 0.01; 256-token pooled prior",
+ "sources": [
+  "ARC2 training-pool codex TITO ledgers (node1 collect 20261006: node1-p30241, node1-p30242); no ARC2 evaluation tasks, no ARC3 games"
+ ],
+ "pools": {
+  "training1000": 25,
+  "nvarc_training": 25
+ },
+ "total_tokens": 2004330,
+ "images": 389,
+ "videos": 0,
+ "media_mode": "real images through the vision tower (multimodal replay)",
+ "segments": 50,
+ "plan_sha256": "bbf5f2e5f8ec3bbdb291f7ed9f9e1175b9055d3f30b8709bffbddb8b7dd50a63",
+ "manifest_sha256": "e6dc03a4286b1e75b5f273294c49288a82ed3d0b22666dae31ff11fff8991ecb",
+ "run_id": "20261009-gean320-int3-mm-2a34605e"
+}

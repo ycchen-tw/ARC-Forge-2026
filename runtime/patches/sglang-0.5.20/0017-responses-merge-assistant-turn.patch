@@ -1,0 +1,34 @@
+From 104150f454f0b2cb2ae3d66c7717c8cc04efc307 Mon Sep 17 00:00:00 2001
+From: arc <a@b.c>
+Date: Sat, 19 Sep 2026 16:26:26 +0000
+Subject: [PATCH] arc: 0017-responses-merge-assistant-turn (merge one logical
+ turn regardless of item phase)
+
+---
+ .../sglang/srt/entrypoints/openai/serving_responses.py | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/python/sglang/srt/entrypoints/openai/serving_responses.py b/python/sglang/srt/entrypoints/openai/serving_responses.py
+index 9fdcbe39..e48ee9a7 100644
+--- a/python/sglang/srt/entrypoints/openai/serving_responses.py
++++ b/python/sglang/srt/entrypoints/openai/serving_responses.py
+@@ -1385,7 +1385,15 @@ class OpenAIServingResponses(OpenAIServingChat):
+                 and merged
+                 and isinstance(merged[-1], dict)
+                 and merged[-1].get("role") == "assistant"
+-                and merged[-1].get("phase") == msg.get("phase")
++                # ARC_0017_MERGE_ASSISTANT_TURN: do not split a logical turn on
++                # ``phase``. Responses clients (codex) replay one assistant turn
++                # as reasoning + message(phase=commentary) + function_call items;
++                # keying the merge on ``phase`` renders them as three assistant
++                # blocks, two of them "<think>\n\n</think>\n\n" followed by
++                # <|im_end|>, and Qwen3.8 then imitates that shape: ~100
++                # reasoning tokens, "\n\n", end of turn, no tool call
++                # (2026-09-19: 16x4-turn probe 4-10/60 such turns vs 0/64 on the
++                # pre-0.5.20 line, whose merge ignored ``phase``).
+             ):
+                 prev = merged[-1] = dict(merged[-1])
+                 # Lift mixed str/list content to list parts so non-text parts
+-- 
+2.43.0
+

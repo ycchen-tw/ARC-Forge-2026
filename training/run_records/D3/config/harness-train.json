@@ -1,0 +1,27 @@
+{
+ "schema_version": 1,
+ "kind": "arc3_g2seed",
+ "fence": "bwrap",
+ "tito": {
+  "required": true
+ },
+ "cache_salt": "episode",
+ "concurrency": 16,
+ "arm_config": "work/arc_code/configs/b200-g2seed-rl-v7.json",
+ "arm_python": ".venv/bin/python",
+ "gateway_python": "$ARC_RUNS/arc_code/harness-venv/bin/python",
+ "corpus": "$ARC_ARC3_CORPUS",
+ "prep": "$ARC_DATA/arc-code-prep",
+ "ffmpeg": "$ARC_FFMPEG",
+ "model_context_window": 235000,
+ "auto_compact_token_limit": 130000,
+ "output_token_budget": 300000,
+ "episode_wall_seconds": 10800,
+ "note": "stream groups: 16 samples/group; 4 groups per TP1 replica (tp1x4), 64 sessions each.",
+ "serve_context_length": 240000,
+ "packet_level_docs": "latest",
+ "window_change": true,
+ "efficiency_free_fraction": 0.9325048082403138,
+ "seed_note_done": true,
+ "stop_after_first_window": true
+}

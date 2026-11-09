@@ -1,0 +1,90 @@
+--- arc_agi3_harnesses/20260908/arc-code/act.py	2026-09-08 01:16:08.746040641 +0000
++++ arc-code-prep/act.py	2026-09-16 11:54:33.445312168 +0000
+@@ -22,7 +22,10 @@
+ from pydantic import BaseModel
+ from requests.utils import dict_from_cookiejar
+ 
+-BASE_URL = "https://three.arcprize.org"
++# Offline runs point this at a local server that speaks these same endpoints
++# (work/arc_agi3/arc_code_qwen/offline_arc_server.py). Leave it unset and the
++# harness plays the real API exactly as upstream does.
++BASE_URL = os.environ.get("ARC_BASE_URL", "https://three.arcprize.org")
+ 
+ LOG = "logs.txt"
+ STATE = "state.json"
+--- arc_agi3_harnesses/20260908/arc-code/run.py	2026-09-08 01:16:08.756979749 +0000
++++ arc-code-prep/run.py	2026-09-16 12:00:57.798936458 +0000
+@@ -35,7 +35,9 @@
+ 
+ from act import DEFAULT_BUDGET, Scorecard  # noqa: E402
+ 
+-RUNS = REPO / "runs"
++# Run artefacts belong under $ARC_RUNS/<task>/ on this box, not inside the
++# vendored checkout. Unset, this is upstream's own default.
++RUNS = Path(os.environ.get("ARCSEC_RUNS") or (REPO / "runs"))
+ MODEL = "claude-opus-5"
+ TASK = (
+     "Read CLAUDE.md, then play the game with ./act until `./act status` reports "
+@@ -144,7 +146,12 @@
+             f'exec python3 "{ws / "client.py"}" "$@"\n'
+         )
+     else:
+-        shim.write_text(f'#!/bin/sh\nexec uv run --project "{REPO}" python "{REPO}/act.py" "$@"\n')
++        # Upstream shells out to `uv run`, which pins the project's Python 3.13.
++        # Offline we run under the interpreter that already has arc_agi, so the
++        # agent gets the same actuator without a second environment.
++        shim.write_text(
++            f'#!/bin/sh\nexec "{sys.executable}" "{REPO}/act.py" "$@"\n'
++        )
+     shim.chmod(0o755)
+     return ws
+ 
+--- arc_agi3_harnesses/20260908/arc-code/rig/agents.py	2026-09-08 01:16:08.756979749 +0000
++++ arc-code-prep/rig/agents.py	2026-09-16 13:26:28.666471957 +0000
+@@ -166,11 +166,36 @@
+     LEVELS = ("minimal", "low", "medium", "high", "xhigh", "max", "ultra")
+     EFFORT = os.environ.get("ARCSEC_EFFORT", "high")
+ 
++    # Extra `-c key=value` settings, ';'-separated. This is how a local
++    # OpenAI-compatible endpoint is selected without editing the user's
++    # ~/.codex/config.toml, which belongs to the human, not to a batch.
++    EXTRA_CONFIG = tuple(
++        item.strip()
++        for item in os.environ.get("ARCSEC_CODEX_CONFIG", "").split(";")
++        if item.strip()
++    )
++
++    # Set ARCSEC_JAIL to a jail.sh and every session runs inside a bubblewrap
++    # mount+network namespace that simply does not contain the games' source.
++    # Codex's own sandbox is redundant there and cannot nest usefully, so the
++    # bypass flag is the honest thing to pass -- it is what that flag is for.
++    JAIL = os.environ.get("ARCSEC_JAIL", "")
++
+     def argv(self, task: str, model: str, ws: Path) -> list[str]:
++        extra: list[str] = []
++        for item in self.EXTRA_CONFIG:
++            extra += ["-c", item]
++        prefix: list[str] = []
++        sandbox = ["-s", "workspace-write"]
++        if self.JAIL:
++            prefix = ["/bin/bash", self.JAIL, str(ws)]
++            sandbox = ["--dangerously-bypass-approvals-and-sandbox"]
+         return [
++            *prefix,
+             "codex",
+             "exec",
+             "--json",
++            *extra,
+             "-m",
+             model,
+             "-c",
+@@ -179,8 +204,7 @@
+             "approval_policy=never",
+             "-c",
+             "sandbox_workspace_write.network_access=true",
+-            "-s",
+-            "workspace-write",
++            *sandbox,
+             "--skip-git-repo-check",
+             "-C",
+             str(ws),

@@ -1,0 +1,33 @@
+{
+ "run_id": "20261009-gean320-int3-mm-2a34605e",
+ "mask_sha256": "5757e97501b6a2b9db70e2969e05bf7e1a3f41508c4ac8dc7dd0632a146ef669",
+ "mtp_mask_sha256": "76db528968dc90e56be4212630d09ab88b36185633013a032df155a6905ecd7a",
+ "plan_sha256": "bbf5f2e5f8ec3bbdb291f7ed9f9e1175b9055d3f30b8709bffbddb8b7dd50a63",
+ "fork_sha": "cd15559a287232cb350a6c1cbec62004a570eb03",
+ "bf16_source": "$ARC_NFS/models/Qwen3.8-Flash-Next",
+ "fp8_model": "$ARC_RAM_RUNS/qwen38fn_eval/20261009-gean320-int3-mm-01a1206d/calib-fp8",
+ "fp8_config_sha256": "ab45c7041414216c035184231b9dce219eaaec46170a2c713124afb3e2014977",
+ "prune_manifest_sha256": "455292751c8eb14d76f0737b206990aa6044610c0cfb02678dcf9b248112a3d4",
+ "code": {
+  "work/qwen38fn_dflash/feed_int3_mm_calib.py": "8d439e6adea6f8e6ac5a7f54868de1ab09c598e5caab963332d93d0e141a225c",
+  "work/qwen38fn_dflash/int3_mm_calib_runtime.py": "8789a6987c3d0f28919cc790fd73ac1d2643e3e34c92cd56298536bd8fad01c4",
+  "work/qwen38fn_dflash/capture_tito.py": "f00e45dfc97dc7a2329ba3f2633a5576b650f7649ceb53e2e84badce64698b87",
+  "work/qwen38fn_dflash/capture_tito_runtime.py": "0c31a16e665f90ec6f5372a46972226a41a594f8db3f7f83c7b1b2e9de5f2511",
+  "work/qwen38fn_eval/gptq_hess_hook.py": "4ef462dfa389b63b84dab799b659b2bcea0fcce779cbeb5fc7833175a03bda60",
+  "work/qwen38fn_eval/direct_checkpoint.py": "5b6bc85a904fef7a045e82350cee371af82fc10b293e7c00d462b2fcff330a1d",
+  "work/qwen38fn_eval/quantize_int3_gptq.py": "e3dcda7035ebefe0e177b5ae0214d8e88ee3f313f6240ddba9de0f02627cfc96",
+  "work/qwen38fn_eval/gptq_int3.py": "b99edade49570fe146ac808220dc18a99c1d8a9404d215b7fd68d2488de065e0",
+  "work/qwen38fn_eval/run_gean_int3_mm.py": "09f931ad894087c29a91d06ae3434de82aeb52ec2e2d0b90bd99feb8247afde5"
+ },
+ "window": 6,
+ "target_tokens": 2000000,
+ "gpus": [
+  0,
+  1,
+  2,
+  3
+ ],
+ "resident_cache_only": false,
+ "ple_mm_placeholder_ids": true,
+ "method": "one-shot"
+}

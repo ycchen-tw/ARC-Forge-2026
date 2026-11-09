@@ -1,0 +1,295 @@
+{
+ "version": 1,
+ "created": "2026-10-17T09:45:35+00:00",
+ "argv": [
+  "work/qwen38fn_dflash/make_data_plan.py",
+  "--out",
+  "$ARC_RUNS/qwen38fn_dflash/20261017-codex1015-plan",
+  "--target-profile",
+  "$ARC_RUNS/qwen38fn_dflash/20261017-int3-target-profile/profile-int3-w3a8-tp1.json",
+  "--seed",
+  "0",
+  "--codex1015",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261014T211944-2607392",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T061802-2772632",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261014T212347-2618294",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T061759-2772638",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30813-20261014T212346-2618308",
+  "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30814-20261014T212349-2618322",
+  "--fraction",
+  "arc2=1",
+  "arc3=1",
+  "--passes",
+  "arc2=1",
+  "arc3=1",
+  "--context-length",
+  "220000",
+  "--codex-heldout",
+  "arc2/arc2=30x2",
+  "arc3/comm-A=12x2",
+  "arc3/comm-B=6x2",
+  "arc3/off25=2x6",
+  "arc3/synth=2x4",
+  "--codex-heldout-groups",
+  "arc3:tn36",
+  "arc3:tu93",
+  "--workers",
+  "16"
+ ],
+ "code": {
+  "commit": "e6ad85d55e4fa6186dc8cb4bc867fbe44c021255",
+  "dirty": false
+ },
+ "seed": 0,
+ "context_length": 220000,
+ "block_size": 8,
+ "anchor_rule": "a >= 1 and mask[a] and mask[a + 1]",
+ "min_supervised": 7,
+ "heldout_tokens": 3000000.0,
+ "heldout_salt": "dflash-data-plan-v1",
+ "arc3_heldout_games": 2,
+ "heldout_parents": 8,
+ "image_detail": "high",
+ "codex_heldout": {
+  "arc2/arc2": {
+   "groups": 30,
+   "items_per_group": 2
+  },
+  "arc3/comm-A": {
+   "groups": 12,
+   "items_per_group": 2
+  },
+  "arc3/comm-B": {
+   "groups": 6,
+   "items_per_group": 2
+  },
+  "arc3/off25": {
+   "groups": 2,
+   "items_per_group": 6
+  },
+  "arc3/synth": {
+   "groups": 2,
+   "items_per_group": 4
+  }
+ },
+ "codex_heldout_groups": [
+  "arc3:tn36",
+  "arc3:tu93"
+ ],
+ "known_approximations": [
+  "codex1015: think-budget-forced tokens stay supervised (not sampled; 436 of 185M arc3 tokens where the ledger kept flags)"
+ ],
+ "corpora": {
+  "arc2": {
+   "fraction": 1.0,
+   "passes": 1,
+   "sources": [
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261014T211944-2607392",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T061802-2772632",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261014T212347-2618294",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T061759-2772638",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30813-20261014T212346-2618308",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30814-20261014T212349-2618322"
+   ]
+  },
+  "arc3": {
+   "fraction": 1.0,
+   "passes": 1,
+   "sources": [
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261014T211944-2607392",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T061802-2772632",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261014T212347-2618294",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T061759-2772638",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30813-20261014T212346-2618308",
+    "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30814-20261014T212349-2618322"
+   ]
+  }
+ },
+ "target_profile": {
+  "path": "$ARC_RUNS/qwen38fn_dflash/20261017-int3-target-profile/profile-int3-w3a8-tp1.json",
+  "instance": "node1-p31749-20261017T094258-1018307",
+  "sha256": "79c05febb562d17ef39616266f76d99a04977729ea7bb36fbb51b0c1b9afbdde",
+  "served_model_name": "dflash-capture.node1-p31749-20261017T094258-1018307.79c05febb562d17e",
+  "model_path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/qwen38fn-gean320-int3-gptq"
+ },
+ "tokenizer": {
+  "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/qwen38fn-gean320-int3-gptq/tokenizer.json",
+  "sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3"
+ },
+ "tito_instances": [
+  {
+   "name": "node1-p30811-20261014T211944-2607392",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261014T211944-2607392",
+   "kind": "codex1015",
+   "server_json_sha256": "7d4ef215c87522470d136c728d0df4ec6e9067dfe450fcd146f5d6513b082850"
+  },
+  {
+   "name": "node1-p30811-20261015T032003-3677178",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+   "kind": "codex1015",
+   "server_json_sha256": "cb8bfd269baca748c8377c6017f139dcb124d25510791f8a6d08780aca31d689"
+  },
+  {
+   "name": "node1-p30811-20261015T061802-2772632",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T061802-2772632",
+   "kind": "codex1015",
+   "server_json_sha256": "75b1da2ec65f0fc958a7480d4818fdad1b652ef98572a6b663b48ee73b6f724d"
+  },
+  {
+   "name": "node1-p30812-20261014T212347-2618294",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261014T212347-2618294",
+   "kind": "codex1015",
+   "server_json_sha256": "fe0bd61bd5a158d8a81e678a27be387cd9a3f66cb41286f0a5f1635cda67bd39"
+  },
+  {
+   "name": "node1-p30812-20261015T032000-3677184",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184",
+   "kind": "codex1015",
+   "server_json_sha256": "e8e0f2f196bb27c6955f5e7cc8e6ed01f43e0504d095ebdddd22e3f10da40fa8"
+  },
+  {
+   "name": "node1-p30812-20261015T061759-2772638",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T061759-2772638",
+   "kind": "codex1015",
+   "server_json_sha256": "813263e7eb5c3926d25ebc26a9b97fb44ac36c19df953a07d64e1634c40b3ce7"
+  },
+  {
+   "name": "node1-p30813-20261014T212346-2618308",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30813-20261014T212346-2618308",
+   "kind": "codex1015",
+   "server_json_sha256": "033ab2adaae0a723b1405647cf5c3952d0766b462ec6406ffc46571327915aa5"
+  },
+  {
+   "name": "node1-p30814-20261014T212349-2618322",
+   "path": "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30814-20261014T212349-2618322",
+   "kind": "codex1015",
+   "server_json_sha256": "c50be2bc5d027ae6131fe4bcdc0fc3159a9203fdf0ea7f97fd9eb27a583f6267"
+  }
+ ],
+ "sources": [],
+ "heldout": {
+  "arc2/arc2": {
+   "groups_rule": 30,
+   "items_per_group": 2,
+   "forced": [],
+   "items": 58,
+   "tokens": 4242994,
+   "group_tokens": 11082380,
+   "groups": 30,
+   "eligible_groups": 926,
+   "group_list": [
+    "independent1000:ind_0008",
+    "independent1000:ind_0056",
+    "independent1000:ind_0074",
+    "independent1000:ind_0107",
+    "independent1000:ind_0149",
+    "independent1000:ind_0225",
+    "independent1000:ind_0260",
+    "independent1000:ind_0261",
+    "independent1000:ind_0299",
+    "independent1000:ind_0300",
+    "independent1000:ind_0314",
+    "independent1000:ind_0315",
+    "independent1000:ind_0318",
+    "independent1000:ind_0345",
+    "independent1000:ind_0359",
+    "independent1000:ind_0407",
+    "independent1000:ind_0472",
+    "independent1000:ind_0479",
+    "independent1000:ind_0494",
+    "independent1000:ind_0528",
+    "independent1000:ind_0530",
+    "independent1000:ind_0540",
+    "independent1000:ind_0551",
+    "independent1000:ind_0566",
+    "independent1000:ind_0618",
+    "independent1000:ind_0626",
+    "independent1000:ind_0720",
+    "independent1000:ind_0776",
+    "independent1000:ind_0807",
+    "independent1000:ind_0925"
+   ]
+  },
+  "arc3/comm-A": {
+   "groups_rule": 12,
+   "items_per_group": 2,
+   "forced": [],
+   "items": 20,
+   "tokens": 1642341,
+   "group_tokens": 6388731,
+   "groups": 12,
+   "eligible_groups": 451,
+   "group_list": [
+    "arc3:an66",
+    "arc3:ba60",
+    "arc3:cb13",
+    "arc3:lm22",
+    "arc3:pi29",
+    "arc3:pm80",
+    "arc3:si46",
+    "arc3:sp08",
+    "arc3:tm97",
+    "arc3:vc49",
+    "arc3:wa13",
+    "arc3:zb57"
+   ]
+  },
+  "arc3/comm-B": {
+   "groups_rule": 6,
+   "items_per_group": 2,
+   "forced": [],
+   "items": 7,
+   "tokens": 552745,
+   "group_tokens": 935820,
+   "groups": 6,
+   "eligible_groups": 125,
+   "group_list": [
+    "arc3:au55",
+    "arc3:ax23",
+    "arc3:bm78",
+    "arc3:bu97",
+    "arc3:bx14",
+    "arc3:or83"
+   ]
+  },
+  "arc3/off25": {
+   "groups_rule": 2,
+   "items_per_group": 6,
+   "forced": [
+    "arc3:tn36",
+    "arc3:tu93"
+   ],
+   "items": 12,
+   "tokens": 1186703,
+   "group_tokens": 20552196,
+   "groups": 2,
+   "eligible_groups": 25,
+   "group_list": [
+    "arc3:tn36",
+    "arc3:tu93"
+   ]
+  },
+  "arc3/synth": {
+   "groups_rule": 2,
+   "items_per_group": 4,
+   "forced": [],
+   "items": 8,
+   "tokens": 485760,
+   "group_tokens": 12905648,
+   "groups": 2,
+   "eligible_groups": 16,
+   "group_list": [
+    "arc3:bloom26",
+    "arc3:ki26"
+   ]
+  }
+ },
+ "plan_sha256": "c8e1608e7c2e07e54ebd7fe8a9b4fded9c0ed4b18e2c63ba1777c6be07fe41c3",
+ "jobs": 12119
+}

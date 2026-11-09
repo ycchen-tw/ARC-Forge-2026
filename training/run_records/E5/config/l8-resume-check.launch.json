@@ -1,0 +1,262 @@
+{
+  "tag": "20261020-l8-resume-check",
+  "git_commit": "e43722bee7f599b7a9fac0cbe8c8cccd711194d7",
+  "git_dirty": true,
+  "plan": "$ARC_RUNS/qwen38fn_dflash/20261019-codex1015-small50-plan",
+  "plan_sha256": "267da19bee164a900fcb977fa6eb4214d66a9e7cee464505d0ea9bc5cc80615b",
+  "plan_summary": {
+    "by_split": {
+      "arc2": {
+        "heldout": {
+          "jobs": 4,
+          "items": 4,
+          "tokens": 240497,
+          "supervised": 163792,
+          "eligible_anchors": 163740
+        },
+        "train": {
+          "jobs": 27,
+          "items": 27,
+          "tokens": 2021326,
+          "supervised": 1503714,
+          "eligible_anchors": 1503247
+        }
+      },
+      "arc3": {
+        "heldout": {
+          "jobs": 5,
+          "items": 5,
+          "tokens": 314519,
+          "supervised": 213091,
+          "eligible_anchors": 213002
+        },
+        "train": {
+          "jobs": 29,
+          "items": 29,
+          "tokens": 2009375,
+          "supervised": 1235454,
+          "eligible_anchors": 1234840
+        }
+      }
+    },
+    "by_subset": {
+      "arc2": {
+        "independent1000": {
+          "heldout": {
+            "jobs": 4,
+            "items": 4,
+            "tokens": 240497,
+            "supervised": 163792,
+            "eligible_anchors": 163740
+          },
+          "train": {
+            "jobs": 27,
+            "items": 27,
+            "tokens": 2021326,
+            "supervised": 1503714,
+            "eligible_anchors": 1503247
+          }
+        }
+      },
+      "arc3": {
+        "comm-A": {
+          "heldout": {
+            "jobs": 3,
+            "items": 3,
+            "tokens": 196612,
+            "supervised": 140772,
+            "eligible_anchors": 140708
+          },
+          "train": {
+            "jobs": 23,
+            "items": 23,
+            "tokens": 1455803,
+            "supervised": 865598,
+            "eligible_anchors": 865119
+          }
+        },
+        "off25": {
+          "heldout": {
+            "jobs": 2,
+            "items": 2,
+            "tokens": 117907,
+            "supervised": 72319,
+            "eligible_anchors": 72294
+          },
+          "train": {
+            "jobs": 6,
+            "items": 6,
+            "tokens": 553572,
+            "supervised": 369856,
+            "eligible_anchors": 369721
+          }
+        }
+      }
+    },
+    "sources": {
+      "arc2": {
+        "items": 294,
+        "tokens": 21516359,
+        "supervised": 16262777,
+        "eligible_anchors": 16258170,
+        "kept_round_tokens": 0,
+        "gen_spans": 4607,
+        "stop_substituted": 0,
+        "rewound_gen_tokens": 0
+      },
+      "arc3": {
+        "items": 267,
+        "tokens": 19866466,
+        "supervised": 12657476,
+        "eligible_anchors": 12650723,
+        "kept_round_tokens": 0,
+        "gen_spans": 6753,
+        "stop_substituted": 0,
+        "rewound_gen_tokens": 14
+      }
+    },
+    "skipped": {
+      "arc2": {
+        "heldout_unsampled": 1
+      },
+      "arc3": {
+        "heldout_unsampled": 2
+      }
+    },
+    "skipped_tokens": {
+      "arc2": {
+        "heldout_unsampled": 33780
+      },
+      "arc3": {
+        "heldout_unsampled": 204635
+      }
+    },
+    "groups": {
+      "arc2/independent1000": 146,
+      "arc3/comm-A": 125,
+      "arc3/off25": 25
+    },
+    "heldout": {
+      "arc2/arc2": {
+        "groups_rule": 2,
+        "items_per_group": 2,
+        "forced": [],
+        "items": 4,
+        "tokens": 240497,
+        "group_tokens": 274277,
+        "groups": 2,
+        "eligible_groups": 146
+      },
+      "arc3/comm-A": {
+        "groups_rule": 2,
+        "items_per_group": 2,
+        "forced": [],
+        "items": 3,
+        "tokens": 196612,
+        "group_tokens": 292633,
+        "groups": 2,
+        "eligible_groups": 125
+      },
+      "arc3/off25": {
+        "groups_rule": 1,
+        "items_per_group": 2,
+        "forced": [],
+        "items": 2,
+        "tokens": 117907,
+        "group_tokens": 226521,
+        "groups": 1,
+        "eligible_groups": 25
+      }
+    },
+    "dropped": {
+      "codex1015": {
+        "no_workspace": {
+          "segments": 2,
+          "tokens": 260,
+          "supervised": 16
+        },
+        "few_supervised": {
+          "segments": 15,
+          "tokens": 2550,
+          "supervised": 15
+        }
+      }
+    }
+  },
+  "plan_config": {
+    "argv": [
+      "work/qwen38fn_dflash/make_data_plan.py",
+      "--out",
+      "$ARC_RUNS/qwen38fn_dflash/20261019-codex1015-small50-plan",
+      "--target-profile",
+      "$ARC_RUNS/qwen38fn_dflash/20261017-int3-target-profile/profile-int3-w3a8-tp1.json",
+      "--seed",
+      "0",
+      "--codex1015",
+      "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+      "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184",
+      "--fraction",
+      "arc2=0.1",
+      "arc3=0.1",
+      "--passes",
+      "arc2=1",
+      "arc3=1",
+      "--context-length",
+      "220000",
+      "--codex-heldout",
+      "arc2/arc2=2x2",
+      "arc3/comm-A=2x2",
+      "arc3/off25=1x2",
+      "--workers",
+      "4"
+    ],
+    "seed": 0,
+    "corpora": {
+      "arc2": {
+        "fraction": 0.1,
+        "passes": 1,
+        "sources": [
+          "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+          "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184"
+        ]
+      },
+      "arc3": {
+        "fraction": 0.1,
+        "passes": 1,
+        "sources": [
+          "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30811-20261015T032003-3677178",
+          "$ARC_RAM_RUNS/qwen38fn_dflash/20261017-codex1015/ledger/node1-p30812-20261015T032000-3677184"
+        ]
+      }
+    },
+    "code": {
+      "commit": "527f8e284182854e4017b1549d10f65a25d2c0e4",
+      "dirty": true
+    }
+  },
+  "init": "$ARC_RUNS/qwen38fn_dflash/20261020-l8-expand/step8251-L8-copy",
+  "smoke": true,
+  "gate": "",
+  "gate_sha256": null,
+  "capture_gpus": "2,3",
+  "trainer_gpus": "0,1",
+  "target_profile": "$ARC_RUNS/qwen38fn_dflash/20261017-int3-target-profile/profile-int3-w3a8-tp1.json",
+  "capture_queue_gib": 48,
+  "resume": true,
+  "warm_start": null,
+  "warm_new_data": false,
+  "step_schedule": false,
+  "opd_root": null,
+  "opd_weight": null,
+  "opd_fraction": null,
+  "opd_loss": "reached",
+  "offline_accept_weight": "1",
+  "heldout_from": null,
+  "opd_heldout": null,
+  "prefix_gate_alpha": "0.01",
+  "prefix_gate_temperature": "0.7",
+  "lr_schedule": "wsd",
+  "lr_decay_fraction": "0.3",
+  "cov_weight": "0.05",
+  "cov_weight_final": "0.05"
+}

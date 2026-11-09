@@ -1,0 +1,55 @@
+{
+ "schema": "arcforge.kaggle.model_overlay.v1",
+ "base_manifest_sha256": "92b231d01c2aa5810fb024efd204ed47a957f3d95aec84c96f6d5fac0302d57c",
+ "deploy_manifest_sha256": "12df8569a3469f74b11a118d57299c295496c35e937610c91d40edca905a15a9",
+ "files": {
+  "model-00001.safetensors": {
+   "sha256": "7bf6134c4b3cd9a4996308bbfe31884ac81fe971792652befafb76427132269d",
+   "bytes": 5368638152
+  },
+  "model-00002.safetensors": {
+   "sha256": "38013bb6c73b75681157a1c60e334dc080770f1d299abb1adb9a41e78b9dddfd",
+   "bytes": 5020650152
+  },
+  "model-00011.safetensors": {
+   "sha256": "a9215f9dcecd16cda6fd5eaa668ef7f63e2dbafe0515dfa9b5826fb65765dda6",
+   "bytes": 5223665266
+  },
+  "model-00017.safetensors": {
+   "sha256": "643cbb87ea14938da02249ea307ba11d1f46a5827fe40a363896281e6c5950a3",
+   "bytes": 5368375512
+  },
+  "model-00018.safetensors": {
+   "sha256": "ee01e50ea75fdbea85400492a3b5f89f9fd511d096d4a7f490bea5060d9b453e",
+   "bytes": 157287080
+  }
+ },
+ "rl_merged": {
+  "weight_version": "30",
+  "step": 30,
+  "optimizer_step": 30,
+  "run": "$ARC_RUNS/qwen38fn_rl/20261029-arc2r4-ctx64k90v2-qadR-tp1x3-b40k-c64k-alltests-g24b576-lr1e-4/trainer",
+  "base_model": "/dev/shm/uid-$UID/models/qwen38fn-qadmix-R-int3-bf16dense",
+  "lora_rank": 8,
+  "lora_alpha": 16,
+  "dense_qat": {
+   "scheme": "block_fp8_e4m3_128x128",
+   "scale_suffix": "weight_scale_inv",
+   "modules": 144,
+   "forward_checked": null
+  },
+  "merged_dir": "/dev/shm/uid-$UID/arc2r4h73-merged/v000030",
+  "merged_manifest_sha256": "5ccdffcec08c90bceb1368db25c8d0f10931b8b0a815abf31d62122572ad64ae"
+ },
+ "report": {
+  "replaced": 516,
+  "changed_bytes": 284610511,
+  "rewritten_shards": [
+   "model-00001.safetensors",
+   "model-00002.safetensors",
+   "model-00011.safetensors",
+   "model-00017.safetensors",
+   "model-00018.safetensors"
+  ]
+ }
+}

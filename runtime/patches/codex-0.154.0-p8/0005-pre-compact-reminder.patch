@@ -1,0 +1,115 @@
+diff --git a/codex-rs/core/src/session/turn.rs b/codex-rs/core/src/session/turn.rs
+index 4f10a1b..175a66c 100644
+--- a/codex-rs/core/src/session/turn.rs
++++ b/codex-rs/core/src/session/turn.rs
+@@ -506,6 +506,20 @@ pub(crate) async fn run_turn(
+                     );
+                 }
+ 
++                if needs_follow_up
++                    && !token_limit_reached
++                    && turn_context
++                        .config
++                        .features
++                        .enabled(Feature::PreCompactReminder)
++                {
++                    maybe_remind_before_compaction(
++                        &sess,
++                        &turn_context.config.codex_home,
++                        token_status.active_context_tokens,
++                    )
++                    .await;
++                }
+                 let external_request = needs_follow_up
+                     && turn_context
+                         .config
+@@ -1255,6 +1269,62 @@ async fn maybe_run_previous_model_inline_compact(
+     Ok(())
+ }
+ 
++/// Context size when the pre-compaction reminder was last sent; 0 = armed. A compaction shrinks
++/// the context below it, which re-arms the reminder for the new window.
++static PRE_COMPACT_REMINDED_AT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
++
++/// `features.pre_compact_reminder`: once per context window, when the context passes the
++/// threshold on the first line of `$CODEX_HOME/compact_reminder`, add the rest of that file as a
++/// user message so the model can write down what it knows before the auto-compaction summarises.
++async fn maybe_remind_before_compaction(
++    sess: &Arc<Session>,
++    codex_home: &codex_utils_absolute_path::AbsolutePathBuf,
++    active_context_tokens: i64,
++) {
++    use std::sync::atomic::Ordering;
++    let last = PRE_COMPACT_REMINDED_AT.load(Ordering::Relaxed);
++    if last > 0 && active_context_tokens < last {
++        PRE_COMPACT_REMINDED_AT.store(0, Ordering::Relaxed);
++    } else if last > 0 {
++        return;
++    }
++    let path = codex_home.join("compact_reminder");
++    let text = match std::fs::read_to_string(&path) {
++        Ok(text) => text,
++        Err(err) => {
++            error!("pre-compaction reminder {}: {err}", path.display());
++            return;
++        }
++    };
++    let (first, message) = text.split_once('\n').unwrap_or((text.as_str(), ""));
++    let threshold = match first.trim().parse::<i64>() {
++        Ok(threshold) => threshold,
++        Err(err) => {
++            error!("pre-compaction reminder {}: first line {first:?} is not a token count ({err})", path.display());
++            return;
++        }
++    };
++    let message = message.trim();
++    if active_context_tokens < threshold || message.is_empty() {
++        return;
++    }
++    PRE_COMPACT_REMINDED_AT.store(active_context_tokens, Ordering::Relaxed);
++    info!(active_context_tokens, threshold, "pre-compaction reminder");
++    let item = ResponseItem::Message {
++        id: None,
++        role: "user".to_string(),
++        content: vec![ContentItem::InputText {
++            text: message.to_string(),
++        }],
++        phase: None,
++        internal_chat_message_metadata_passthrough: None,
++    };
++    if sess.inject_if_running(vec![item]).await.is_err() {
++        error!("pre-compaction reminder: no running turn to inject into");
++        PRE_COMPACT_REMINDED_AT.store(0, Ordering::Relaxed);
++    }
++}
++
+ /// `features.external_compact_request`: a harness asks for a compaction by creating
+ /// `$CODEX_HOME/compact_request`. The file may hold a token count; below it the request is
+ /// dropped (an early, small context is not worth summarising). Either way the file is consumed
+diff --git a/codex-rs/features/src/lib.rs b/codex-rs/features/src/lib.rs
+index f80b285..81eec5b 100644
+--- a/codex-rs/features/src/lib.rs
++++ b/codex-rs/features/src/lib.rs
+@@ -118,6 +118,9 @@ pub enum Feature {
+     CompactionStripAnalysis,
+     /// Compact at the next turn boundary when a harness has created `$CODEX_HOME/compact_request`.
+     ExternalCompactRequest,
++    /// Once per context window, past a token threshold, tell the model a compaction is near
++    /// (`$CODEX_HOME/compact_reminder`: threshold on the first line, the message after it).
++    PreCompactReminder,
+     /// Record model-attempted tool calls in internal Responses metadata.
+     ExecutedToolCallMetadata,
+     /// Enable JavaScript code mode backed by the standalone host process.
+@@ -1041,6 +1044,12 @@ pub const FEATURES: &[FeatureSpec] = &[
+         stage: Stage::UnderDevelopment,
+         default_enabled: false,
+     },
++    FeatureSpec {
++        id: Feature::PreCompactReminder,
++        key: "pre_compact_reminder",
++        stage: Stage::UnderDevelopment,
++        default_enabled: false,
++    },
+     FeatureSpec {
+         id: Feature::ExecutedToolCallMetadata,
+         key: "executed_tool_call_metadata",

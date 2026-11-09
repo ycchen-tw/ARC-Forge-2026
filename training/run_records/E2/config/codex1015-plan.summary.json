@@ -1,0 +1,255 @@
+{
+ "by_split": {
+  "arc3": {
+   "heldout": {
+    "jobs": 47,
+    "items": 47,
+    "tokens": 3867549,
+    "supervised": 2664880,
+    "eligible_anchors": 2663590
+   },
+   "train": {
+    "jobs": 6845,
+    "items": 6845,
+    "tokens": 627639517,
+    "supervised": 439782173,
+    "eligible_anchors": 439603953
+   }
+  },
+  "arc2": {
+   "heldout": {
+    "jobs": 58,
+    "items": 58,
+    "tokens": 4242994,
+    "supervised": 3170513,
+    "eligible_anchors": 3169593
+   },
+   "train": {
+    "jobs": 5169,
+    "items": 5169,
+    "tokens": 385589959,
+    "supervised": 286046176,
+    "eligible_anchors": 285960309
+   }
+  }
+ },
+ "by_subset": {
+  "arc3": {
+   "synth": {
+    "heldout": {
+     "jobs": 8,
+     "items": 8,
+     "tokens": 485760,
+     "supervised": 331221,
+     "eligible_anchors": 331023
+    },
+    "train": {
+     "jobs": 1614,
+     "items": 1614,
+     "tokens": 149055668,
+     "supervised": 105812786,
+     "eligible_anchors": 105774164
+    }
+   },
+   "off25": {
+    "heldout": {
+     "jobs": 12,
+     "items": 12,
+     "tokens": 1186703,
+     "supervised": 836429,
+     "eligible_anchors": 836107
+    },
+    "train": {
+     "jobs": 2360,
+     "items": 2360,
+     "tokens": 225840439,
+     "supervised": 158916093,
+     "eligible_anchors": 158852641
+    }
+   },
+   "comm-A": {
+    "heldout": {
+     "jobs": 20,
+     "items": 20,
+     "tokens": 1642341,
+     "supervised": 1140525,
+     "eligible_anchors": 1140001
+    },
+    "train": {
+     "jobs": 2522,
+     "items": 2522,
+     "tokens": 223558235,
+     "supervised": 155439199,
+     "eligible_anchors": 155373009
+    }
+   },
+   "comm-B": {
+    "heldout": {
+     "jobs": 7,
+     "items": 7,
+     "tokens": 552745,
+     "supervised": 356705,
+     "eligible_anchors": 356459
+    },
+    "train": {
+     "jobs": 349,
+     "items": 349,
+     "tokens": 29185175,
+     "supervised": 19614095,
+     "eligible_anchors": 19604139
+    }
+   }
+  },
+  "arc2": {
+   "independent1000": {
+    "heldout": {
+     "jobs": 58,
+     "items": 58,
+     "tokens": 4242994,
+     "supervised": 3170513,
+     "eligible_anchors": 3169593
+    },
+    "train": {
+     "jobs": 5147,
+     "items": 5147,
+     "tokens": 384295928,
+     "supervised": 285192200,
+     "eligible_anchors": 285106638
+    }
+   },
+   "smoke": {
+    "train": {
+     "jobs": 22,
+     "items": 22,
+     "tokens": 1294031,
+     "supervised": 853976,
+     "eligible_anchors": 853671
+    }
+   }
+  }
+ },
+ "sources": {
+  "arc2": {
+   "items": 5319,
+   "tokens": 396935849,
+   "supervised": 294535082,
+   "eligible_anchors": 294446794,
+   "kept_round_tokens": 0,
+   "gen_spans": 88288,
+   "stop_substituted": 0,
+   "rewound_gen_tokens": 19415
+  },
+  "arc3": {
+   "items": 7295,
+   "tokens": 668421912,
+   "supervised": 468407666,
+   "eligible_anchors": 468217890,
+   "kept_round_tokens": 0,
+   "gen_spans": 189776,
+   "stop_substituted": 0,
+   "rewound_gen_tokens": 47039
+  }
+ },
+ "skipped": {
+  "arc2": {
+   "heldout_unsampled": 89,
+   "few_supervised": 2,
+   "too_long": 1
+  },
+  "arc3": {
+   "heldout_unsampled": 403
+  }
+ },
+ "skipped_tokens": {
+  "arc2": {
+   "heldout_unsampled": 6839386,
+   "few_supervised": 11949,
+   "too_long": 251561
+  },
+  "arc3": {
+   "heldout_unsampled": 36914846
+  }
+ },
+ "groups": {
+  "arc2/independent1000": 926,
+  "arc2/smoke": 4,
+  "arc3/comm-A": 451,
+  "arc3/comm-B": 125,
+  "arc3/off25": 25,
+  "arc3/synth": 16
+ },
+ "heldout": {
+  "arc2/arc2": {
+   "groups_rule": 30,
+   "items_per_group": 2,
+   "forced": [],
+   "items": 58,
+   "tokens": 4242994,
+   "group_tokens": 11082380,
+   "groups": 30,
+   "eligible_groups": 926
+  },
+  "arc3/comm-A": {
+   "groups_rule": 12,
+   "items_per_group": 2,
+   "forced": [],
+   "items": 20,
+   "tokens": 1642341,
+   "group_tokens": 6388731,
+   "groups": 12,
+   "eligible_groups": 451
+  },
+  "arc3/comm-B": {
+   "groups_rule": 6,
+   "items_per_group": 2,
+   "forced": [],
+   "items": 7,
+   "tokens": 552745,
+   "group_tokens": 935820,
+   "groups": 6,
+   "eligible_groups": 125
+  },
+  "arc3/off25": {
+   "groups_rule": 2,
+   "items_per_group": 6,
+   "forced": [
+    "arc3:tn36",
+    "arc3:tu93"
+   ],
+   "items": 12,
+   "tokens": 1186703,
+   "group_tokens": 20552196,
+   "groups": 2,
+   "eligible_groups": 25
+  },
+  "arc3/synth": {
+   "groups_rule": 2,
+   "items_per_group": 4,
+   "forced": [],
+   "items": 8,
+   "tokens": 485760,
+   "group_tokens": 12905648,
+   "groups": 2,
+   "eligible_groups": 16
+  }
+ },
+ "dropped": {
+  "codex1015": {
+   "no_workspace": {
+    "segments": 8,
+    "tokens": 1040,
+    "supervised": 64
+   },
+   "few_supervised": {
+    "segments": 135,
+    "tokens": 25890,
+    "supervised": 135
+   },
+   "harness_test": {
+    "segments": 3,
+    "tokens": 160330,
+    "supervised": 76192
+   }
+  }
+ }
+}

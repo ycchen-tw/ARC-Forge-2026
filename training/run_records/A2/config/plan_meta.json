@@ -1,0 +1,68 @@
+{
+ "salt": "reap-mm-plan-v1",
+ "inventory": "$ARC_RUNS/qwen38fn_eval/20261009-reap-mm/inventory/items.jsonl",
+ "inventory_items_sha256": "40cf91736f2dd74eeb214e28de37b9c6d52daae20d7667e379006a68b5b766aa",
+ "instances": [
+  {
+   "name": "node1-p30241-20261005T205435-2524457",
+   "path": "$ARC_RAM_RUNS/qwen38fn_eval/20261009-reap-mm/ledger/node1-p30241-20261005T205435-2524457",
+   "server_json_sha256": "64c809b0c1deb0c5145c9c1f4766453d70816ad102051a4a81157203350cf609"
+  },
+  {
+   "name": "node1-p30242-20261005T211903-2542675",
+   "path": "$ARC_RAM_RUNS/qwen38fn_eval/20261009-reap-mm/ledger/node1-p30242-20261005T211903-2542675",
+   "server_json_sha256": "e1997ffc6d649796ee5ff13a8cf229af890a496d213ece203d071f269761b9d3"
+  }
+ ],
+ "model_dir": "$ARC_NFS/models/Qwen3.8-Flash-Next-FP8",
+ "context_length": 262144,
+ "pools": [
+  "training1000",
+  "nvarc_training"
+ ],
+ "calib_tokens_target": 20000000.0,
+ "heldout_tokens_target": 3000000.0,
+ "diag_tokens_target": 8000000.0,
+ "diag_tainted": "arc3 public-25 = bench C",
+ "jobs": 735,
+ "plan_sha256": "bbf5f2e5f8ec3bbdb291f7ed9f9e1175b9055d3f30b8709bffbddb8b7dd50a63",
+ "calib": {
+  "segments": 555,
+  "num_tokens": 20009871,
+  "n_gen": 14488724,
+  "image_tokens": 414923,
+  "video_tokens": 0,
+  "groups": 454,
+  "pool:training1000": 301,
+  "pool:nvarc_training": 254
+ },
+ "heldout": {
+  "segments": 89,
+  "num_tokens": 3091330,
+  "n_gen": 2204259,
+  "image_tokens": 67776,
+  "video_tokens": 0,
+  "groups": 50,
+  "pool:nvarc_training": 36,
+  "pool:training1000": 53
+ },
+ "diag": {
+  "segments": 91,
+  "num_tokens": 8086055,
+  "n_gen": 5105604,
+  "image_tokens": 144137,
+  "video_tokens": 82224,
+  "groups": 23,
+  "pool:arc3": 91
+ },
+ "eligible": {
+  "segments": 1939,
+  "num_tokens": 68990045,
+  "n_gen": 49719431,
+  "image_tokens": 1416848,
+  "video_tokens": 0,
+  "groups": 1000,
+  "pool:training1000": 1041,
+  "pool:nvarc_training": 898
+ }
+}

@@ -1,0 +1,1186 @@
+From ec35017691e17f4afc6f44815003da5a93b16b39 Mon Sep 17 00:00:00 2001
+From: arc <a@b.c>
+Date: Mon, 21 Sep 2026 09:05:16 +0000
+Subject: [PATCH] arc: 0001-view-video-tool (read a local video file into the
+ model's input)
+
+Adds a `view_video` tool mirroring `view_image`, the protocol types it needs,
+and a config override for input modalities.
+
+- `InputModality::Video` and `FunctionCallOutputContentItem::InputVideo`.
+  The wire tag is `video_url`, not `input_video`: the Responses API has no
+  official video content part, and OpenAI-compatible servers that do accept
+  video key on the chat-style tag. The Rust name stays aligned with its
+  siblings via `#[serde(rename)]`.
+- `model_input_modalities` config. Codex cannot read modality metadata from an
+  OpenAI-compatible `/v1/models`, so an unknown slug falls back to text+image
+  and the video gate can never open. Threaded through `ModelInfoOverrides`,
+  which every model-info resolution passes through -- setting it only on
+  `Config` silently does nothing.
+- `strip_video_when_unsupported`, matching the existing image/audio strippers.
+  Without it, video left in history after a model switch reaches the API and
+  fails there, with an error that does not name the cause.
+- Token estimate for `video_url` parts in the context manager, next to the
+  image and audio ones: frame count and display size from the mp4/mov header,
+  ceil(frames / 2) x (ceil(w / 32) * ceil(h / 32) + 16) tokens, the tool's
+  `max_frames` / `max_tokens_per_frame` hints not applied (the server bills the
+  container's frames); an unreadable container keeps its raw size. Without it a
+  video counted as base64 bytes / 4 and the post-sampling check compacted right
+  after the call: a 450 KB recording came out at ~152k tokens, ~1.7k on sglang.
+- `Feature::ViewVideo`, under development and off by default.
+---
+ codex-rs/app-server/src/notification_media.rs |   6 +-
+ codex-rs/config/src/config_toml.rs            |   9 +
+ codex-rs/core/src/config/mod.rs               |   6 +
+ .../core/src/context/unsupported_media.rs     |   5 +
+ codex-rs/core/src/context_manager/history.rs  | 174 +++++++++++-
+ .../core/src/context_manager/history_tests.rs |  93 +++++++
+ .../core/src/context_manager/normalize.rs     |  35 +++
+ codex-rs/core/src/session/step_settings.rs    |   4 +
+ codex-rs/core/src/tools/handlers/mod.rs       |   3 +
+ .../core/src/tools/handlers/view_video.rs     | 258 ++++++++++++++++++
+ .../src/tools/handlers/view_video_spec.rs     |  72 +++++
+ codex-rs/core/src/tools/spec_plan.rs          |  14 +
+ codex-rs/ext/image-generation/src/tool.rs     |   1 +
+ codex-rs/features/src/lib.rs                  |   8 +
+ codex-rs/models-manager/src/config.rs         |   7 +
+ codex-rs/models-manager/src/model_info.rs     |   3 +
+ codex-rs/protocol/src/models.rs               |  38 ++-
+ codex-rs/protocol/src/openai_models.rs        |   2 +
+ codex-rs/tools/src/tool_output.rs             |   6 +
+ codex-rs/utils/output-truncation/src/lib.rs   |  15 +
+ 20 files changed, 755 insertions(+), 4 deletions(-)
+ create mode 100644 codex-rs/core/src/tools/handlers/view_video.rs
+ create mode 100644 codex-rs/core/src/tools/handlers/view_video_spec.rs
+
+diff --git a/codex-rs/app-server/src/notification_media.rs b/codex-rs/app-server/src/notification_media.rs
+index 9fca0f3..6bde26b 100644
+--- a/codex-rs/app-server/src/notification_media.rs
++++ b/codex-rs/app-server/src/notification_media.rs
+@@ -30,7 +30,8 @@ pub(crate) fn without_notification_media(notification: ServerNotification) -> Se
+                     if let Some(items) = output.content_items_mut() {
+                         items.retain(|item| match item {
+                             FunctionCallOutputContentItem::InputImage { .. }
+-                            | FunctionCallOutputContentItem::InputAudio { .. } => false,
++                            | FunctionCallOutputContentItem::InputAudio { .. }
++                            | FunctionCallOutputContentItem::InputVideo { .. } => false,
+                             FunctionCallOutputContentItem::InputText { .. }
+                             | FunctionCallOutputContentItem::EncryptedContent { .. } => true,
+                         });
+@@ -165,7 +166,8 @@ fn without_thread_item_media(mut item: ThreadItem) -> ThreadItem {
+         } => {
+             items.retain(|item| match item {
+                 FunctionCallOutputContentItem::InputImage { .. }
+-                | FunctionCallOutputContentItem::InputAudio { .. } => false,
++                | FunctionCallOutputContentItem::InputAudio { .. }
++                | FunctionCallOutputContentItem::InputVideo { .. } => false,
+                 FunctionCallOutputContentItem::InputText { .. }
+                 | FunctionCallOutputContentItem::EncryptedContent { .. } => true,
+             });
+diff --git a/codex-rs/config/src/config_toml.rs b/codex-rs/config/src/config_toml.rs
+index 7bf9814..9f41e37 100644
+--- a/codex-rs/config/src/config_toml.rs
++++ b/codex-rs/config/src/config_toml.rs
+@@ -1,5 +1,6 @@
+ //! Schema-heavy configuration TOML types used by Codex.
+ 
++use codex_protocol::openai_models::InputModality;
+ use std::collections::BTreeMap;
+ use std::collections::HashMap;
+ use std::num::NonZeroU64;
+@@ -164,6 +165,14 @@ pub struct ConfigToml {
+     /// Size of the context window for the model, in tokens.
+     pub model_context_window: Option<i64>,
+ 
++    /// Input modalities the model accepts, overriding the built-in metadata.
++    ///
++    /// Codex cannot read modality metadata from an OpenAI-compatible
++    /// `/v1/models`, so unknown slugs fall back to text+image. Set this when
++    /// serving a model whose real modality set is different, e.g.
++    /// `model_input_modalities = ["text", "image", "video"]`.
++    pub model_input_modalities: Option<Vec<InputModality>>,
++
+     /// Token usage threshold triggering auto-compaction of conversation history.
+     pub model_auto_compact_token_limit: Option<i64>,
+ 
+diff --git a/codex-rs/core/src/config/mod.rs b/codex-rs/core/src/config/mod.rs
+index ebda977..f4fd8fa 100644
+--- a/codex-rs/core/src/config/mod.rs
++++ b/codex-rs/core/src/config/mod.rs
+@@ -1,3 +1,4 @@
++use codex_protocol::openai_models::InputModality;
+ use crate::config::edit::ConfigEdit;
+ use crate::config::edit::ConfigEditsBuilder;
+ use crate::context::world_state::validate_managed_developer_instructions;
+@@ -627,6 +628,9 @@ pub struct Config {
+     /// Size of the context window for the model, in tokens.
+     pub model_context_window: Option<i64>,
+ 
++    /// Input modalities the model accepts, overriding built-in metadata.
++    pub model_input_modalities: Option<Vec<InputModality>>,
++
+     /// Token usage threshold triggering auto-compaction of conversation history.
+     pub model_auto_compact_token_limit: Option<i64>,
+ 
+@@ -1614,6 +1618,7 @@ impl Config {
+     pub fn to_models_manager_config(&self) -> ModelsManagerConfig {
+         ModelsManagerConfig {
+             model_context_window: self.model_context_window,
++            model_input_modalities: self.model_input_modalities.clone(),
+             model_auto_compact_token_limit: self.model_auto_compact_token_limit,
+             tool_output_token_limit: self.tool_output_token_limit,
+             base_instructions: self.base_instructions.clone().filter(|_| {
+@@ -4154,6 +4159,7 @@ impl Config {
+             service_tier,
+             review_model,
+             model_context_window: cfg.model_context_window,
++            model_input_modalities: cfg.model_input_modalities.clone(),
+             model_auto_compact_token_limit: cfg.model_auto_compact_token_limit,
+             model_auto_compact_token_limit_scope: cfg
+                 .model_auto_compact_token_limit_scope
+diff --git a/codex-rs/core/src/context/unsupported_media.rs b/codex-rs/core/src/context/unsupported_media.rs
+index 8b22564..7087ffb 100644
+--- a/codex-rs/core/src/context/unsupported_media.rs
++++ b/codex-rs/core/src/context/unsupported_media.rs
+@@ -17,6 +17,11 @@ impl UnsupportedMedia {
+         text: "audio content omitted because you do not support audio input",
+         content_kind: "audio.unsupported",
+     };
++
++    pub(crate) const VIDEO: Self = Self {
++        text: "video content omitted because you do not support video input",
++        content_kind: "video.unsupported",
++    };
+ }
+ 
+ impl ContextualUserFragment for UnsupportedMedia {
+diff --git a/codex-rs/core/src/context_manager/history.rs b/codex-rs/core/src/context_manager/history.rs
+index ee077e3..e9a51cb 100644
+--- a/codex-rs/core/src/context_manager/history.rs
++++ b/codex-rs/core/src/context_manager/history.rs
+@@ -42,6 +42,7 @@ use codex_protocol::models::FunctionCallOutputBody;
+ use codex_protocol::models::FunctionCallOutputContentItem;
+ use codex_protocol::models::ImageDetail;
+ use codex_protocol::models::ResponseItem;
++use codex_protocol::models::VideoUrl;
+ use codex_protocol::openai_models::InputModality;
+ use codex_protocol::protocol::InterAgentCommunication;
+ use codex_protocol::protocol::SessionSource;
+@@ -717,6 +718,9 @@ impl ContextManager {
+ 
+         // strip audio when model does not support it
+         normalize::strip_audio_when_unsupported(input_modalities, items);
++
++        // strip video when model does not support it
++        normalize::strip_video_when_unsupported(input_modalities, items);
+     }
+ 
+     /// Walk backward from a rollback cut and trim contiguous pre-turn context-update items.
+@@ -858,6 +862,8 @@ fn estimate_response_item_model_visible_bytes(item: &ResponseItem) -> i64 {
+                 image_data_url_estimate_adjustment(item);
+             let (audio_payload_bytes, audio_replacement_bytes) =
+                 audio_data_url_estimate_adjustment(item);
++            let (video_payload_bytes, video_replacement_bytes) =
++                video_data_url_estimate_adjustment(item);
+             let (encrypted_payload_bytes, encrypted_replacement_bytes) =
+                 encrypted_function_output_estimate_adjustment(item);
+             // Replace raw base64 payload bytes with per-modality estimates.
+@@ -867,7 +873,9 @@ fn estimate_response_item_model_visible_bytes(item: &ResponseItem) -> i64 {
+                 .saturating_sub(image_payload_bytes)
+                 .saturating_add(image_replacement_bytes)
+                 .saturating_sub(audio_payload_bytes)
+-                .saturating_add(audio_replacement_bytes);
++                .saturating_add(audio_replacement_bytes)
++                .saturating_sub(video_payload_bytes)
++                .saturating_add(video_replacement_bytes);
+             raw.saturating_sub(encrypted_payload_bytes)
+                 .saturating_add(encrypted_replacement_bytes)
+         }
+@@ -1051,6 +1059,170 @@ fn audio_data_url_estimate_adjustment(item: &ResponseItem) -> (i64, i64) {
+     (payload_bytes, replacement_bytes)
+ }
+ 
++/// Returns the base64 payload for inline video data URLs (`view_video`).
++fn parse_base64_video_data_url(url: &str) -> Option<&str> {
++    parse_base64_data_url(url, "video/")
++}
++
++// Video estimate, the `video_url` counterpart of the image and audio estimates above.
++// Counted at its raw serialized size, a video is base64 bytes / 4 = file bytes / 3
++// tokens: a 450 KB lossless 384 px recording came out at ~152k tokens while the server
++// spends ~1.7k on it, and the post-sampling check (`get_total_token_usage`) compacted on
++// that estimate right after the tool call.
++//
++// The cost on Qwen-VL style servers (sglang) is: frames are merged in temporal groups of
++// 2, each group costs one token per 32x32 pixel block (16 px patches, 2x2 merge), plus a
++// few tokens of timestamp and vision start/end markers. The frame count and display size
++// come from the ISO-BMFF header (mp4/mov), so nothing is decoded. The tool call's
++// `max_frames` / `max_tokens_per_frame` hints are deliberately NOT applied: on the Kaggle
++// sglang the cost follows the container's frame count whatever `max_frames` says (66
++// frames with max_frames=16 cost 33 groups, 5,056 tokens), so capping by the hint would
++// under-estimate. Using the container's sample count over-estimates when a server does
++// sample fewer frames (e.g. by fps), which is the safe direction for a compaction trigger.
++const VIDEO_FRAMES_PER_TEMPORAL_GROUP: i64 = 2;
++const VIDEO_PIXELS_PER_TOKEN_SIDE: i64 = 32;
++/// Timestamp text plus vision start/end per temporal group; measured 9-10 on sglang 0.5.20
++/// with Qwen3.8 (`<0.2 seconds><|vision_start|>...<|vision_end|>`), rounded up.
++const VIDEO_TEMPORAL_GROUP_OVERHEAD_TOKENS: i64 = 16;
++const VIDEO_ESTIMATE_CACHE_SIZE: usize = 32;
++
++static VIDEO_ESTIMATE_CACHE: LazyLock<BlockingLruCache<[u8; 20], Option<VideoGeometry>>> =
++    LazyLock::new(|| {
++        BlockingLruCache::new(
++            NonZeroUsize::new(VIDEO_ESTIMATE_CACHE_SIZE).unwrap_or(NonZeroUsize::MIN),
++        )
++    });
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++struct VideoGeometry {
++    frames: u32,
++    width: u32,
++    height: u32,
++}
++
++/// Sibling ISO-BMFF boxes of `data` as `(type, body)`. Stops at the first malformed box.
++struct BmffBoxes<'a> {
++    rest: &'a [u8],
++}
++
++impl<'a> Iterator for BmffBoxes<'a> {
++    type Item = ([u8; 4], &'a [u8]);
++
++    fn next(&mut self) -> Option<Self::Item> {
++        let rest = self.rest;
++        let size = u64::from(u32::from_be_bytes(rest.get(0..4)?.try_into().ok()?));
++        let kind: [u8; 4] = rest.get(4..8)?.try_into().ok()?;
++        let (header, size) = match size {
++            0 => (8, rest.len() as u64),
++            1 => (16, u64::from_be_bytes(rest.get(8..16)?.try_into().ok()?)),
++            size => (8, size),
++        };
++        if size < header || size > rest.len() as u64 {
++            self.rest = &[];
++            return None;
++        }
++        let (header, size) = (header as usize, size as usize);
++        self.rest = &rest[size..];
++        Some((kind, &rest[header..size]))
++    }
++}
++
++fn bmff_child<'a>(data: &'a [u8], kind: &[u8; 4]) -> Option<&'a [u8]> {
++    BmffBoxes { rest: data }
++        .find(|(box_kind, _)| box_kind == kind)
++        .map(|(_, body)| body)
++}
++
++/// Sample count and display size of the first video track of an mp4/mov file.
++fn iso_bmff_video_geometry(data: &[u8]) -> Option<VideoGeometry> {
++    let moov = bmff_child(data, b"moov")?;
++    BmffBoxes { rest: moov }
++        .filter(|(kind, _)| kind == b"trak")
++        .find_map(|(_, trak)| {
++            let mdia = bmff_child(trak, b"mdia")?;
++            // hdlr: version/flags, pre_defined, handler_type.
++            if bmff_child(mdia, b"hdlr")?.get(8..12)? != b"vide" {
++                return None;
++            }
++            let stbl = bmff_child(bmff_child(mdia, b"minf")?, b"stbl")?;
++            // stsz: version/flags, sample_size, sample_count.
++            let stsz = bmff_child(stbl, b"stsz")?;
++            let frames = u32::from_be_bytes(stsz.get(8..12)?.try_into().ok()?);
++            // tkhd ends with width and height as 16.16 fixed point in both versions.
++            let tkhd = bmff_child(trak, b"tkhd")?;
++            let end = tkhd.len();
++            let width_at = end.checked_sub(8)?;
++            let width = u32::from_be_bytes(tkhd.get(width_at..end - 4)?.try_into().ok()?) >> 16;
++            let height = u32::from_be_bytes(tkhd.get(end - 4..end)?.try_into().ok()?) >> 16;
++            (frames > 0 && width > 0 && height > 0).then_some(VideoGeometry {
++                frames,
++                width,
++                height,
++            })
++        })
++}
++
++/// Estimated model tokens for one `video_url` part, or `None` when the payload is not a
++/// base64 mp4/mov data URL whose header can be read.
++fn estimate_video_tokens(video_url: &VideoUrl) -> Option<i64> {
++    let payload = parse_base64_video_data_url(&video_url.url)?;
++    let key = sha1_digest(video_url.url.as_bytes());
++    let geometry = VIDEO_ESTIMATE_CACHE.get_or_insert_with(key, || {
++        let bytes = BASE64_STANDARD.decode(payload).ok()?;
++        iso_bmff_video_geometry(&bytes)
++    })?;
++    let groups = i64::from(geometry.frames).saturating_add(VIDEO_FRAMES_PER_TEMPORAL_GROUP - 1)
++        / VIDEO_FRAMES_PER_TEMPORAL_GROUP;
++    let side = |pixels: u32| {
++        i64::from(pixels).saturating_add(VIDEO_PIXELS_PER_TOKEN_SIDE - 1)
++            / VIDEO_PIXELS_PER_TOKEN_SIDE
++    };
++    let per_group = side(geometry.width).saturating_mul(side(geometry.height));
++    Some(
++        groups
++            .max(1)
++            .saturating_mul(per_group.saturating_add(VIDEO_TEMPORAL_GROUP_OVERHEAD_TOKENS)),
++    )
++}
++
++/// Scans one response item for inline base64 video data URLs whose size can be estimated
++/// and returns (payload bytes to subtract, replacement bytes). A video whose header cannot
++/// be read keeps its raw size and logs a warning: over-estimating only compacts early,
++/// under-estimating could send a request past the server's context.
++fn video_data_url_estimate_adjustment(item: &ResponseItem) -> (i64, i64) {
++    let mut payload_bytes = 0i64;
++    let mut replacement_bytes = 0i64;
++    let (ResponseItem::FunctionCallOutput { output, .. }
++    | ResponseItem::CustomToolCallOutput { output, .. }) = item
++    else {
++        return (0, 0);
++    };
++    let FunctionCallOutputBody::ContentItems(items) = &output.body else {
++        return (0, 0);
++    };
++    for content_item in items {
++        let FunctionCallOutputContentItem::InputVideo { video_url } = content_item else {
++            continue;
++        };
++        let Some(payload) = parse_base64_video_data_url(&video_url.url) else {
++            continue;
++        };
++        let Some(tokens) = estimate_video_tokens(video_url) else {
++            tracing::warn!(
++                "video data URL ({} bytes) has no readable mp4/mov header; counting it at its raw size",
++                video_url.url.len()
++            );
++            continue;
++        };
++        payload_bytes =
++            payload_bytes.saturating_add(i64::try_from(payload.len()).unwrap_or(i64::MAX));
++        let tokens = usize::try_from(tokens).unwrap_or(usize::MAX);
++        replacement_bytes = replacement_bytes
++            .saturating_add(i64::try_from(approx_bytes_for_tokens(tokens)).unwrap_or(i64::MAX));
++    }
++    (payload_bytes, replacement_bytes)
++}
++
+ fn encrypted_function_output_estimate_adjustment(item: &ResponseItem) -> (i64, i64) {
+     let mut payload_bytes = 0i64;
+     let mut replacement_bytes = 0i64;
+diff --git a/codex-rs/core/src/context_manager/history_tests.rs b/codex-rs/core/src/context_manager/history_tests.rs
+index bfbe5d1..517e2fa 100644
+--- a/codex-rs/core/src/context_manager/history_tests.rs
++++ b/codex-rs/core/src/context_manager/history_tests.rs
+@@ -2918,3 +2918,96 @@ fn text_only_items_unchanged() {
+ 
+     assert_eq!(estimated, raw_len);
+ }
++
++fn bmff_box(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
++    let mut out = (u32::try_from(body.len() + 8).unwrap()).to_be_bytes().to_vec();
++    out.extend_from_slice(kind);
++    out.extend_from_slice(body);
++    out
++}
++
++/// Smallest mp4 the video estimate reads: one video track with `frames` samples of
++/// `width` x `height` (tkhd v0 is 84 bytes, width/height last as 16.16 fixed point).
++fn mp4_data_url(frames: u32, width: u32, height: u32, padding: usize) -> (String, usize) {
++    let mut tkhd = vec![0u8; 76];
++    tkhd.extend_from_slice(&(width << 16).to_be_bytes());
++    tkhd.extend_from_slice(&(height << 16).to_be_bytes());
++    let mut hdlr = vec![0u8; 8];
++    hdlr.extend_from_slice(b"vide");
++    hdlr.extend_from_slice(&[0u8; 13]);
++    let mut stsz = vec![0u8; 8];
++    stsz.extend_from_slice(&frames.to_be_bytes());
++    stsz.extend((0..frames).flat_map(|_| 100u32.to_be_bytes()));
++    let stbl = bmff_box(b"stbl", &bmff_box(b"stsz", &stsz));
++    let minf = bmff_box(b"minf", &stbl);
++    let mdia = bmff_box(b"mdia", &[bmff_box(b"hdlr", &hdlr), minf].concat());
++    let trak = bmff_box(b"trak", &[bmff_box(b"tkhd", &tkhd), mdia].concat());
++    let mut bytes = bmff_box(b"ftyp", b"isom\0\0\x02\0isomiso2avc1mp41");
++    bytes.extend(bmff_box(b"moov", &trak));
++    bytes.extend(bmff_box(b"mdat", &vec![0x5a; padding]));
++    let payload = BASE64_STANDARD.encode(bytes);
++    let payload_len = payload.len();
++    (format!("data:video/mp4;base64,{payload}"), payload_len)
++}
++
++fn video_output_item(video_url: VideoUrl) -> ResponseItem {
++    ResponseItem::FunctionCallOutput {
++        id: None,
++        call_id: Some("call-video".to_string()),
++        name: None,
++        namespace: None,
++        output: FunctionCallOutputPayload::from_content_items(vec![
++            FunctionCallOutputContentItem::InputVideo { video_url },
++        ]),
++        internal_chat_message_metadata_passthrough: None,
++    }
++}
++
++#[test]
++fn video_data_url_is_estimated_from_its_mp4_header() {
++    // 23 frames of 384x384, the shape of an ARC-AGI-3 step recording: 12 temporal groups of
++    // 12x12 tokens (+16 markers each), whatever the file size.
++    let (url, payload_len) = mp4_data_url(/*frames*/ 23, /*width*/ 384, /*height*/ 384, 450_000);
++    let item = video_output_item(VideoUrl {
++        url,
++        max_frames: None,
++        max_tokens_per_frame: None,
++        fps: None,
++    });
++    let raw_len = serde_json::to_string(&item).unwrap().len() as i64;
++    let estimated = estimate_response_item_model_visible_bytes(&item);
++    let expected =
++        raw_len - payload_len as i64 + approx_bytes_for_tokens(/*tokens*/ 12 * (144 + 16)) as i64;
++    assert_eq!(estimated, expected);
++    assert!(estimate_item_token_count(&item) < 2_000);
++}
++
++#[test]
++fn video_estimate_ignores_the_frame_hints() {
++    // The Kaggle sglang spends tokens on every container frame whatever max_frames says,
++    // so the hints must not shrink the estimate: 66 frames -> 33 groups, 20x20 tokens each.
++    let (url, payload_len) = mp4_data_url(/*frames*/ 66, /*width*/ 640, /*height*/ 640, 0);
++    let item = video_output_item(VideoUrl {
++        url,
++        max_frames: Some(16),
++        max_tokens_per_frame: Some(300),
++        fps: None,
++    });
++    let raw_len = serde_json::to_string(&item).unwrap().len() as i64;
++    let estimated = estimate_response_item_model_visible_bytes(&item);
++    let expected =
++        raw_len - payload_len as i64 + approx_bytes_for_tokens(/*tokens*/ 33 * (400 + 16)) as i64;
++    assert_eq!(estimated, expected);
++}
++
++#[test]
++fn unreadable_video_keeps_its_raw_size() {
++    let item = video_output_item(VideoUrl {
++        url: format!("data:video/webm;base64,{}", BASE64_STANDARD.encode([0x1a, 0x45, 0xdf, 0xa3])),
++        max_frames: None,
++        max_tokens_per_frame: None,
++        fps: None,
++    });
++    let raw_len = serde_json::to_string(&item).unwrap().len() as i64;
++    assert_eq!(estimate_response_item_model_visible_bytes(&item), raw_len);
++}
+diff --git a/codex-rs/core/src/context_manager/normalize.rs b/codex-rs/core/src/context_manager/normalize.rs
+index 7fc45ba..74a84ab 100644
+--- a/codex-rs/core/src/context_manager/normalize.rs
++++ b/codex-rs/core/src/context_manager/normalize.rs
+@@ -376,6 +376,41 @@ pub(crate) fn strip_images_when_unsupported(
+     }
+ }
+ 
++/// Strip video content from tool outputs when the model does not support video.
++/// When `input_modalities` contains `InputModality::Video`, no stripping is performed.
++///
++/// Only tool outputs are walked: video enters history exclusively through the
++/// `view_video` tool, so there is no message-content counterpart to strip.
++pub(crate) fn strip_video_when_unsupported(
++    input_modalities: &[InputModality],
++    items: &mut [ResponseItemEnvelope],
++) {
++    if input_modalities.contains(&InputModality::Video) {
++        return;
++    }
++
++    for envelope in items.iter_mut() {
++        match &mut envelope.item {
++            ResponseItem::FunctionCallOutput { output, .. }
++            | ResponseItem::CustomToolCallOutput { output, .. } => {
++                if let Some(content_items) = output.content_items_mut() {
++                    for content_item in content_items.iter_mut() {
++                        if matches!(
++                            content_item,
++                            FunctionCallOutputContentItem::InputVideo { .. }
++                        ) {
++                            *content_item = FunctionCallOutputContentItem::InputText {
++                                text: UnsupportedMedia::VIDEO.render(),
++                            };
++                        }
++                    }
++                }
++            }
++            _ => {}
++        }
++    }
++}
++
+ /// Strip audio content from messages and tool outputs when the model does not support audio.
+ /// When `input_modalities` contains `InputModality::Audio`, no stripping is performed.
+ pub(crate) fn strip_audio_when_unsupported(
+diff --git a/codex-rs/core/src/session/step_settings.rs b/codex-rs/core/src/session/step_settings.rs
+index 49502e8..a5305bd 100644
+--- a/codex-rs/core/src/session/step_settings.rs
++++ b/codex-rs/core/src/session/step_settings.rs
+@@ -1,5 +1,6 @@
+ //! Configured inputs retained independently of future thread settings.
+ 
++use codex_protocol::openai_models::InputModality;
+ use crate::config::Constrained;
+ use crate::config::ConstraintError;
+ use crate::config::ConstraintResult;
+@@ -180,6 +181,7 @@ impl ResolvedStepSettings {
+ #[derive(Clone, Debug, Default, PartialEq, Eq)]
+ pub(crate) struct ModelInfoOverrides {
+     pub(crate) context_window: Option<i64>,
++    pub(crate) input_modalities: Option<Vec<InputModality>>,
+     pub(crate) auto_compact_token_limit: Option<i64>,
+     pub(crate) tool_output_token_limit: Option<usize>,
+     pub(crate) base_instructions: Option<String>,
+@@ -189,6 +191,7 @@ impl From<ModelsManagerConfig> for ModelInfoOverrides {
+     fn from(config: ModelsManagerConfig) -> Self {
+         Self {
+             context_window: config.model_context_window,
++            input_modalities: config.model_input_modalities,
+             auto_compact_token_limit: config.model_auto_compact_token_limit,
+             tool_output_token_limit: config.tool_output_token_limit,
+             base_instructions: config.base_instructions,
+@@ -204,6 +207,7 @@ impl ModelInfoOverrides {
+     ) -> ModelsManagerConfig {
+         ModelsManagerConfig {
+             model_context_window: self.context_window,
++            model_input_modalities: self.input_modalities.clone(),
+             model_auto_compact_token_limit: self.auto_compact_token_limit,
+             tool_output_token_limit: self.tool_output_token_limit,
+             base_instructions: self.base_instructions.clone(),
+diff --git a/codex-rs/core/src/tools/handlers/mod.rs b/codex-rs/core/src/tools/handlers/mod.rs
+index ce09df5..b965889 100644
+--- a/codex-rs/core/src/tools/handlers/mod.rs
++++ b/codex-rs/core/src/tools/handlers/mod.rs
+@@ -34,6 +34,8 @@ pub(crate) mod tool_search_spec;
+ pub(crate) mod unified_exec;
+ mod view_image;
+ pub(crate) mod view_image_spec;
++mod view_video;
++pub(crate) mod view_video_spec;
+ mod wait_for_environment;
+ 
+ use codex_file_system::FileSystemSandboxContext;
+@@ -79,6 +81,7 @@ pub use unified_exec::ExecCommandHandler;
+ pub(crate) use unified_exec::ExecCommandHandlerOptions;
+ pub use unified_exec::WriteStdinHandler;
+ pub use view_image::ViewImageHandler;
++pub use view_video::ViewVideoHandler;
+ pub(crate) use wait_for_environment::WaitForEnvironmentHandler;
+ pub use wait_for_environment::WaitForEnvironmentToolConfig;
+ 
+diff --git a/codex-rs/core/src/tools/handlers/view_video.rs b/codex-rs/core/src/tools/handlers/view_video.rs
+new file mode 100644
+index 0000000..26b1851
+--- /dev/null
++++ b/codex-rs/core/src/tools/handlers/view_video.rs
+@@ -0,0 +1,258 @@
++use codex_exec_server::GetMetadataOptions;
++use codex_exec_server::ReadFileOptions;
++use codex_protocol::models::FunctionCallOutputBody;
++use codex_protocol::models::FunctionCallOutputContentItem;
++use codex_protocol::models::FunctionCallOutputPayload;
++use codex_protocol::models::ResponseInputItem;
++use codex_protocol::models::VideoUrl;
++use codex_protocol::openai_models::InputModality;
++use codex_utils_image::data_url_from_bytes;
++use serde::Deserialize;
++use std::path::Path;
++
++use crate::function_tool::FunctionCallError;
++use crate::tools::context::ToolInvocation;
++use crate::tools::context::ToolOutput;
++use crate::tools::context::ToolPayload;
++use crate::tools::context::boxed_tool_output;
++use crate::tools::handlers::parse_arguments;
++use crate::tools::handlers::resolve_tool_environment;
++use crate::tools::handlers::view_video_spec::ViewVideoToolOptions;
++use crate::tools::handlers::view_video_spec::create_view_video_tool;
++use crate::tools::registry::CoreToolRuntime;
++use crate::tools::registry::ToolExecutor;
++use codex_tools::ToolName;
++use codex_tools::ToolSpec;
++
++pub struct ViewVideoHandler {
++    options: ViewVideoToolOptions,
++}
++
++impl Default for ViewVideoHandler {
++    fn default() -> Self {
++        Self {
++            options: ViewVideoToolOptions {
++                include_environment_id: false,
++            },
++        }
++    }
++}
++
++impl ViewVideoHandler {
++    pub(crate) fn new(options: ViewVideoToolOptions) -> Self {
++        Self { options }
++    }
++}
++
++const VIEW_VIDEO_UNSUPPORTED_MESSAGE: &str =
++    "view_video is not allowed because you do not support video inputs";
++
++/// Data URLs inline the whole file into the request body, so an unbounded read
++/// turns a stray large file into a multi-gigabyte request. Refuse early and say
++/// why, rather than letting the server reject an opaque oversized payload.
++const MAX_PROMPT_VIDEO_INPUT_BYTES: u64 = 100 * 1024 * 1024;
++
++/// Extension-based, because the decoder lives on the server and we have no
++/// container parser here. An unknown extension is rejected rather than guessed:
++/// a mislabeled data URL fails deep inside the server with an error that does
++/// not point back at this tool.
++fn video_mime_for_path(path: &Path) -> Option<&'static str> {
++    let extension = path.extension()?.to_str()?;
++    if extension.eq_ignore_ascii_case("mp4") {
++        Some("video/mp4")
++    } else if extension.eq_ignore_ascii_case("webm") {
++        Some("video/webm")
++    } else if extension.eq_ignore_ascii_case("mkv") {
++        Some("video/x-matroska")
++    } else if extension.eq_ignore_ascii_case("mov") {
++        Some("video/quicktime")
++    } else if extension.eq_ignore_ascii_case("avi") {
++        Some("video/x-msvideo")
++    } else {
++        None
++    }
++}
++
++#[derive(Deserialize)]
++struct ViewVideoArgs {
++    path: String,
++    #[serde(default)]
++    environment_id: Option<String>,
++    #[serde(default)]
++    max_frames: Option<u32>,
++    #[serde(default)]
++    max_tokens_per_frame: Option<u32>,
++}
++
++impl ToolExecutor<ToolInvocation> for ViewVideoHandler {
++    fn tool_name(&self) -> ToolName {
++        ToolName::plain("view_video")
++    }
++
++    fn spec(&self) -> ToolSpec {
++        create_view_video_tool(self.options)
++    }
++
++    fn supports_parallel_tool_calls(&self) -> bool {
++        true
++    }
++
++    fn handle<'a>(&'a self, invocation: ToolInvocation) -> codex_tools::ToolExecutorFuture<'a>
++    where
++        ToolInvocation: 'a,
++    {
++        Box::pin(self.handle_call(invocation))
++    }
++}
++
++impl ViewVideoHandler {
++    async fn handle_call(
++        &self,
++        invocation: ToolInvocation,
++    ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
++        if !invocation
++            .turn
++            .model_info()
++            .input_modalities
++            .contains(&InputModality::Video)
++        {
++            return Err(FunctionCallError::RespondToModel(
++                VIEW_VIDEO_UNSUPPORTED_MESSAGE.to_string(),
++            ));
++        }
++
++        let ToolInvocation {
++            turn: _turn,
++            step_context,
++            payload,
++            ..
++        } = invocation;
++
++        let arguments = match payload {
++            ToolPayload::Function { arguments } => arguments,
++            _ => {
++                return Err(FunctionCallError::RespondToModel(
++                    "view_video handler received unsupported payload".to_string(),
++                ));
++            }
++        };
++
++        let ViewVideoArgs {
++            path,
++            environment_id,
++            max_frames,
++            max_tokens_per_frame,
++        } = parse_arguments(&arguments)?;
++
++        let Some(turn_environment) =
++            resolve_tool_environment(&step_context.environments, environment_id.as_deref())?
++        else {
++            return Err(FunctionCallError::RespondToModel(
++                "view_video is unavailable in this session".to_string(),
++            ));
++        };
++        let path_uri = turn_environment.cwd().join(&path).map_err(|err| {
++            FunctionCallError::RespondToModel(format!(
++                "unable to resolve video path `{path}` against environment cwd `{}`: {err}",
++                turn_environment.cwd(),
++            ))
++        })?;
++        let model_visible_path = path_uri.inferred_native_path_string();
++
++        let mime = video_mime_for_path(Path::new(&model_visible_path)).ok_or_else(|| {
++            FunctionCallError::RespondToModel(format!(
++                "unsupported video format for `{model_visible_path}`; expected one of \
++                 .mp4, .webm, .mkv, .mov, .avi"
++            ))
++        })?;
++
++        let sandbox = turn_environment.sandbox_context(/*additional_permissions*/ None);
++        let fs = turn_environment.environment.get_filesystem();
++
++        let metadata = fs
++            .get_metadata(&path_uri, GetMetadataOptions::default(), Some(&sandbox))
++            .await
++            .map_err(|error| {
++                FunctionCallError::RespondToModel(format!(
++                    "unable to locate video at `{model_visible_path}`: {error}"
++                ))
++            })?;
++
++        if !metadata.is_file {
++            return Err(FunctionCallError::RespondToModel(format!(
++                "video path `{model_visible_path}` is not a file"
++            )));
++        }
++        if metadata.size > MAX_PROMPT_VIDEO_INPUT_BYTES {
++            return Err(FunctionCallError::RespondToModel(format!(
++                "video at `{model_visible_path}` is {} bytes, over the {MAX_PROMPT_VIDEO_INPUT_BYTES} byte limit",
++                metadata.size
++            )));
++        }
++
++        let file_bytes = fs
++            .read_file(&path_uri, ReadFileOptions::default(), Some(&sandbox))
++            .await
++            .map_err(|error| {
++                FunctionCallError::RespondToModel(format!(
++                    "unable to read video at `{model_visible_path}`: {error}"
++                ))
++            })?;
++
++        let url = data_url_from_bytes(mime, &file_bytes);
++
++        Ok(boxed_tool_output(ViewVideoOutput {
++            video_url: VideoUrl {
++                url,
++                max_frames,
++                max_tokens_per_frame,
++                fps: None,
++            },
++        }))
++    }
++}
++
++impl CoreToolRuntime for ViewVideoHandler {
++    fn is_builtin_control_tool(&self) -> bool {
++        true
++    }
++}
++
++pub struct ViewVideoOutput {
++    video_url: VideoUrl,
++}
++
++impl ToolOutput for ViewVideoOutput {
++    fn log_output(&self) -> String {
++        format!(
++            "<video data URL omitted: {} bytes, max_frames={:?}, max_tokens_per_frame={:?}>",
++            self.video_url.url.len(),
++            self.video_url.max_frames,
++            self.video_url.max_tokens_per_frame,
++        )
++    }
++
++    fn success_for_logging(&self) -> bool {
++        true
++    }
++
++    fn to_response_item(&self, call_id: &str, _payload: &ToolPayload) -> ResponseInputItem {
++        let body =
++            FunctionCallOutputBody::ContentItems(vec![FunctionCallOutputContentItem::InputVideo {
++                video_url: self.video_url.clone(),
++            }]);
++        let output = FunctionCallOutputPayload {
++            body,
++            success: Some(true),
++        };
++
++        ResponseInputItem::FunctionCallOutput {
++            call_id: call_id.to_string(),
++            output,
++        }
++    }
++
++    fn code_mode_result(&self, _payload: &ToolPayload) -> serde_json::Value {
++        serde_json::json!({ "video_url": self.video_url.url })
++    }
++}
+diff --git a/codex-rs/core/src/tools/handlers/view_video_spec.rs b/codex-rs/core/src/tools/handlers/view_video_spec.rs
+new file mode 100644
+index 0000000..398c42c
+--- /dev/null
++++ b/codex-rs/core/src/tools/handlers/view_video_spec.rs
+@@ -0,0 +1,72 @@
++use codex_protocol::models::VIEW_VIDEO_TOOL_NAME;
++use codex_tools::JsonSchema;
++use codex_tools::ResponsesApiTool;
++use codex_tools::ToolSpec;
++use serde_json::Value;
++use serde_json::json;
++use std::collections::BTreeMap;
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub struct ViewVideoToolOptions {
++    pub include_environment_id: bool,
++}
++
++pub fn create_view_video_tool(options: ViewVideoToolOptions) -> ToolSpec {
++    let mut properties = BTreeMap::from([
++        (
++            "path".to_string(),
++            JsonSchema::string(Some("Local filesystem path to a video file.".to_string())),
++        ),
++        (
++            "max_frames".to_string(),
++            JsonSchema::integer(Some(
++                "Maximum number of frames to decode. Without it the server samples frames at its \
++                 own default rate, which silently discards frames."
++                    .to_string(),
++            )),
++        ),
++        (
++            "max_tokens_per_frame".to_string(),
++            JsonSchema::integer(Some(
++                "Vision-token budget per frame. This is what sets the spatial resolution the \
++                 model sees; lower values cost less but blur fine detail."
++                    .to_string(),
++            )),
++        ),
++    ]);
++    if options.include_environment_id {
++        properties.insert(
++            "environment_id".to_string(),
++            JsonSchema::string(Some(
++                "Environment id from <environment_context>. Omit to use the primary environment."
++                    .to_string(),
++            )),
++        );
++    }
++
++    ToolSpec::Function(ResponsesApiTool {
++        name: VIEW_VIDEO_TOOL_NAME.to_string(),
++        description: "View a local video file from the filesystem when motion or change over time \
++                      needs to be inspected. Use this for videos already available on disk; for a \
++                      single still frame use view_image instead."
++            .to_string(),
++        strict: false,
++        defer_loading: None,
++        parameters: JsonSchema::object(properties, Some(vec!["path".to_string()]), Some(false.into())),
++        output_schema: Some(view_video_output_schema()),
++    })
++}
++
++fn view_video_output_schema() -> Value {
++    json!({
++        "type": "object",
++        "properties": {
++            "video_url": {
++                "type": "string",
++                "description": "Data URL for the loaded video."
++            }
++        },
++        "required": ["video_url"],
++        "additionalProperties": false
++    })
++}
+diff --git a/codex-rs/core/src/tools/spec_plan.rs b/codex-rs/core/src/tools/spec_plan.rs
+index 01054b1..2b89f7f 100644
+--- a/codex-rs/core/src/tools/spec_plan.rs
++++ b/codex-rs/core/src/tools/spec_plan.rs
+@@ -30,6 +30,7 @@ use crate::tools::handlers::SleepHandler;
+ use crate::tools::handlers::TestSyncHandler;
+ use crate::tools::handlers::ToolSearchHandlerCache;
+ use crate::tools::handlers::ViewImageHandler;
++use crate::tools::handlers::ViewVideoHandler;
+ use crate::tools::handlers::WaitForEnvironmentHandler;
+ use crate::tools::handlers::WriteStdinHandler;
+ use crate::tools::handlers::extension_tools::ExtensionToolAdapter;
+@@ -52,6 +53,7 @@ use crate::tools::handlers::multi_agents_v2::SpawnAgentHandler as SpawnAgentHand
+ use crate::tools::handlers::multi_agents_v2::WaitAgentHandler as WaitAgentHandlerV2;
+ use crate::tools::handlers::tool_search_spec::ToolSearchSourceListing;
+ use crate::tools::handlers::view_image_spec::ViewImageToolOptions;
++use crate::tools::handlers::view_video_spec::ViewVideoToolOptions;
+ use crate::tools::hosted_spec::WebSearchToolOptions;
+ use crate::tools::hosted_spec::create_web_search_tool;
+ use crate::tools::registry::CoreToolRuntime;
+@@ -1025,6 +1027,11 @@ fn add_core_tool_sources(context: &CoreToolPlanContext<'_>, registry: &mut ToolR
+                     include_environment_id,
+                 }));
+             }
++            if turn_context.config.features.enabled(Feature::ViewVideo) {
++                registry.add(ViewVideoHandler::new(ViewVideoToolOptions {
++                    include_environment_id,
++                }));
++            }
+         }
+         return;
+     }
+@@ -1279,6 +1286,13 @@ fn add_core_utility_tools(context: &CoreToolPlanContext<'_>, registry: &mut Tool
+             include_environment_id,
+         }));
+     }
++
++    if environment_mode.has_environment() && features.enabled(Feature::ViewVideo) {
++        let include_environment_id = matches!(environment_mode, ToolEnvironmentMode::Multiple);
++        registry.add(ViewVideoHandler::new(ViewVideoToolOptions {
++            include_environment_id,
++        }));
++    }
+ }
+ 
+ #[instrument(level = "trace", skip_all)]
+diff --git a/codex-rs/ext/image-generation/src/tool.rs b/codex-rs/ext/image-generation/src/tool.rs
+index 927cf6f..ac40bb6 100644
+--- a/codex-rs/ext/image-generation/src/tool.rs
++++ b/codex-rs/ext/image-generation/src/tool.rs
+@@ -535,6 +535,7 @@ fn output_image_urls(output: &FunctionCallOutputPayload) -> impl Iterator<Item =
+             FunctionCallOutputContentItem::InputImage { image_url, .. } => Some(image_url.clone()),
+             FunctionCallOutputContentItem::InputText { .. }
+             | FunctionCallOutputContentItem::InputAudio { .. }
++            | FunctionCallOutputContentItem::InputVideo { .. }
+             | FunctionCallOutputContentItem::EncryptedContent { .. } => None,
+         })
+ }
+diff --git a/codex-rs/features/src/lib.rs b/codex-rs/features/src/lib.rs
+index 5b52060..003a4a6 100644
+--- a/codex-rs/features/src/lib.rs
++++ b/codex-rs/features/src/lib.rs
+@@ -98,6 +98,8 @@ pub enum Feature {
+     ShellTool,
+     /// Enable the built-in local image viewer.
+     ViewImage,
++    /// Enable the built-in local video viewer.
++    ViewVideo,
+     /// Allow registration of the built-in sleep tool.
+     SleepTool,
+     /// Enable Claude-style lifecycle hooks loaded from hooks.json files.
+@@ -923,6 +925,12 @@ pub const FEATURES: &[FeatureSpec] = &[
+         stage: Stage::Stable,
+         default_enabled: true,
+     },
++    FeatureSpec {
++        id: Feature::ViewVideo,
++        key: "view_video",
++        stage: Stage::UnderDevelopment,
++        default_enabled: false,
++    },
+     FeatureSpec {
+         id: Feature::SleepTool,
+         key: "sleep_tool",
+diff --git a/codex-rs/models-manager/src/config.rs b/codex-rs/models-manager/src/config.rs
+index 6c32d54..b52617d 100644
+--- a/codex-rs/models-manager/src/config.rs
++++ b/codex-rs/models-manager/src/config.rs
+@@ -1,9 +1,16 @@
++use codex_protocol::openai_models::InputModality;
+ use codex_protocol::config_types::Personality;
+ use codex_protocol::openai_models::ModelsResponse;
+ 
+ #[derive(Debug, Clone, Default)]
+ pub struct ModelsManagerConfig {
+     pub model_context_window: Option<i64>,
++    /// Overrides the model's declared input modalities.
++    ///
++    /// Needed for OpenAI-compatible servers: Codex cannot read modality metadata
++    /// off `/v1/models`, so an unknown slug falls back to text+image and any
++    /// other modality the model actually supports stays unreachable.
++    pub model_input_modalities: Option<Vec<InputModality>>,
+     pub model_auto_compact_token_limit: Option<i64>,
+     pub tool_output_token_limit: Option<usize>,
+     pub base_instructions: Option<String>,
+diff --git a/codex-rs/models-manager/src/model_info.rs b/codex-rs/models-manager/src/model_info.rs
+index ca10069..48f9222 100644
+--- a/codex-rs/models-manager/src/model_info.rs
++++ b/codex-rs/models-manager/src/model_info.rs
+@@ -35,6 +35,9 @@ pub fn with_config_overrides(mut model: ModelInfo, config: &ModelsManagerConfig)
+     if let Some(auto_compact_token_limit) = config.model_auto_compact_token_limit {
+         model.auto_compact_token_limit = Some(auto_compact_token_limit);
+     }
++    if let Some(input_modalities) = &config.model_input_modalities {
++        model.input_modalities = input_modalities.clone();
++    }
+     if let Some(token_limit) = config.tool_output_token_limit {
+         model.truncation_policy = match model.truncation_policy.mode {
+             TruncationMode::Bytes => {
+diff --git a/codex-rs/protocol/src/models.rs b/codex-rs/protocol/src/models.rs
+index d9fed84..6821bc1 100644
+--- a/codex-rs/protocol/src/models.rs
++++ b/codex-rs/protocol/src/models.rs
+@@ -1626,6 +1626,7 @@ fn local_media_error_placeholder(
+ }
+ 
+ pub const VIEW_IMAGE_TOOL_NAME: &str = "view_image";
++pub const VIEW_VIDEO_TOOL_NAME: &str = "view_video";
+ 
+ const IMAGE_OPEN_TAG: &str = "<image>";
+ const IMAGE_CLOSE_TAG: &str = "</image>";
+@@ -2048,6 +2049,30 @@ pub struct SearchToolCallParams {
+     pub limit: Option<usize>,
+ }
+ 
++/// Payload for a `video_url` content part.
++///
++/// `url` carries the video as a data URL. The remaining fields are decoding
++/// hints forwarded verbatim to the inference server; they are omitted from the
++/// wire when unset so servers that do not understand them are unaffected.
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema, TS)]
++pub struct VideoUrl {
++    pub url: String,
++    /// Cap on decoded frames. Pins the server's frame sampling instead of
++    /// letting it silently drop frames to hit its own default fps.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    #[ts(optional)]
++    pub max_frames: Option<u32>,
++    /// Per-frame vision-token budget, which is what actually sets the spatial
++    /// resolution the model sees.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    #[ts(optional)]
++    pub max_tokens_per_frame: Option<u32>,
++    /// Sampling rate used when the server derives frames from a timeline.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    #[ts(optional)]
++    pub fps: Option<f32>,
++}
++
+ /// Responses API compatible content items that can be returned by a tool call.
+ /// This is a subset of ContentItem with the types we support as function call outputs.
+ #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema, TS)]
+@@ -2068,6 +2093,16 @@ pub enum FunctionCallOutputContentItem {
+     InputAudio {
+         audio_url: String,
+     },
++    /// Video attachment returned by a tool call.
++    ///
++    /// Unlike the sibling variants, the wire tag is `video_url` rather than
++    /// `input_video`: the Responses API has no official video content part, and
++    /// OpenAI-compatible servers that do accept video (sglang, vLLM) key on the
++    /// chat-style `video_url` tag. The Rust name stays aligned with its siblings.
++    #[serde(rename = "video_url")]
++    InputVideo {
++        video_url: VideoUrl,
++    },
+     EncryptedContent {
+         encrypted_content: String,
+     },
+@@ -2078,7 +2113,7 @@ pub enum FunctionCallOutputContentItem {
+ ///
+ /// This conversion is intentionally lossy:
+ /// - only `input_text` items are included
+-/// - image and audio items are ignored
++/// - image, audio, and video items are ignored
+ ///
+ /// We use this helper where callers still need a string representation (for
+ /// example telemetry previews or legacy string-only output paths) while keeping
+@@ -2096,6 +2131,7 @@ pub fn function_call_output_content_items_to_text(
+             FunctionCallOutputContentItem::InputText { .. }
+             | FunctionCallOutputContentItem::InputImage { .. }
+             | FunctionCallOutputContentItem::InputAudio { .. }
++            | FunctionCallOutputContentItem::InputVideo { .. }
+             | FunctionCallOutputContentItem::EncryptedContent { .. } => None,
+         })
+         .collect::<Vec<_>>();
+diff --git a/codex-rs/protocol/src/openai_models.rs b/codex-rs/protocol/src/openai_models.rs
+index 8c021b1..cd4b78a 100644
+--- a/codex-rs/protocol/src/openai_models.rs
++++ b/codex-rs/protocol/src/openai_models.rs
+@@ -180,6 +180,8 @@ pub enum InputModality {
+     Image,
+     /// Audio attachments included in user turns.
+     Audio,
++    /// Video attachments included in user turns.
++    Video,
+ }
+ 
+ /// Backward-compatible default when `input_modalities` is omitted on the wire.
+diff --git a/codex-rs/tools/src/tool_output.rs b/codex-rs/tools/src/tool_output.rs
+index a33232e..7427792 100644
+--- a/codex-rs/tools/src/tool_output.rs
++++ b/codex-rs/tools/src/tool_output.rs
+@@ -264,9 +264,15 @@ fn content_items_to_code_mode_result(items: &[FunctionCallOutputContentItem]) ->
+                 {
+                     Some(audio_url.clone())
+                 }
++                FunctionCallOutputContentItem::InputVideo { video_url }
++                    if !video_url.url.trim().is_empty() =>
++                {
++                    Some(video_url.url.clone())
++                }
+                 FunctionCallOutputContentItem::InputText { .. }
+                 | FunctionCallOutputContentItem::InputImage { .. }
+                 | FunctionCallOutputContentItem::InputAudio { .. }
++                | FunctionCallOutputContentItem::InputVideo { .. }
+                 | FunctionCallOutputContentItem::EncryptedContent { .. } => None,
+             })
+             .collect::<Vec<_>>()
+diff --git a/codex-rs/utils/output-truncation/src/lib.rs b/codex-rs/utils/output-truncation/src/lib.rs
+index e612457..2409523 100644
+--- a/codex-rs/utils/output-truncation/src/lib.rs
++++ b/codex-rs/utils/output-truncation/src/lib.rs
+@@ -59,6 +59,7 @@ pub fn formatted_truncate_text_content_items_with_policy(
+             FunctionCallOutputContentItem::InputText { text } => Some(text.as_str()),
+             FunctionCallOutputContentItem::InputImage { .. }
+             | FunctionCallOutputContentItem::InputAudio { .. }
++            | FunctionCallOutputContentItem::InputVideo { .. }
+             | FunctionCallOutputContentItem::EncryptedContent { .. } => None,
+         })
+         .collect::<Vec<_>>();
+@@ -95,6 +96,11 @@ pub fn formatted_truncate_text_content_items_with_policy(
+                 audio_url: audio_url.clone(),
+             })
+         }
++        FunctionCallOutputContentItem::InputVideo { video_url } => {
++            Some(FunctionCallOutputContentItem::InputVideo {
++                video_url: video_url.clone(),
++            })
++        }
+         FunctionCallOutputContentItem::EncryptedContent { encrypted_content } => {
+             Some(FunctionCallOutputContentItem::EncryptedContent {
+                 encrypted_content: encrypted_content.clone(),
+@@ -174,6 +180,15 @@ pub fn truncate_function_output_items_with_policy(
+                     omitted_audio_items += 1;
+                 }
+             }
++            // Kept unconditionally, like images: the cost of a video is fixed
++            // server-side by `max_frames`/`max_tokens_per_frame`, and this crate
++            // has no estimator for it (audio gets one passed in). Dropping it on
++            // a text budget would silently defeat the tool that produced it.
++            FunctionCallOutputContentItem::InputVideo { video_url } => {
++                out.push(FunctionCallOutputContentItem::InputVideo {
++                    video_url: video_url.clone(),
++                });
++            }
+             FunctionCallOutputContentItem::EncryptedContent { encrypted_content } => {
+                 out.push(FunctionCallOutputContentItem::EncryptedContent {
+                     encrypted_content: encrypted_content.clone(),
+-- 
+2.43.0
+

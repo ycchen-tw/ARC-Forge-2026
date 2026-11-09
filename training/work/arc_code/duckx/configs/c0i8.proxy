@@ -1,0 +1,19 @@
+# c0i8: c0i7 with act_nudge (--act-nudge-every 8) removed -- it saved no tokens per level, and its sentence pushes for acting; otherwise verbatim the same as c0i7
+--trim-reasoning-at
+80000
+--trim-keep-items
+8
+--trim-min-gain
+15000
+--carry-tail-tokens
+10000
+--window-at
+100000
+--window-keep
+60000
+--window-notes-after
+90000
+--window-hard
+120000
+--level-watch
+60000,40000,3,6
