@@ -1,5 +1,16 @@
 # ARC Prize 2026 — code for the final submissions (ARC-AGI-2 and ARC-AGI-3)
 
+> The same code is also published by the Fields Model Initiative at
+> **[fieldsmodelorg/ARC-Forge](https://github.com/fieldsmodelorg/ARC-Forge)**.
+>
+> The [Fields Model Initiative](https://www.fieldsmodel.org/) is a non-profit initiative, led by
+> Simon Frieder, that builds fully open-source LLMs for mathematics and releases the weights,
+> training code, data pipelines and evaluation harnesses under open licences. Its first model,
+> [FM-Pochi-32B](https://fieldsmodel.org/fmpochi), won a bronze medal at IMO 2026, the first
+> fully open-source LLM to medal.
+>
+> This work was completed with the assistance of Simon Frieder and the Fields Model Initiative.
+
 Both tracks run the same model and the same agent:
 
 - **Model** — Qwen3.8-Flash-Next with the routed experts pruned from 512 to 320 per layer
